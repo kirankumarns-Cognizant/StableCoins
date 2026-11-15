@@ -52,5 +52,15 @@
       "registry.npmjs.org"
     ],
     "codespacesInstallRerun": "PENDING"
+  },
+  "publicationManifestFix": {
+    "packageManifestsIncluded": true,
+    "existingWalletGeneratorJavaFilesIncluded": 4,
+    "codespacesInstallRerun": "PENDING",
+    "publishableFilesAudited": 555,
+    "missingPublishableFiles": 0,
+    "generatedCdkOutputsExcluded": 8,
+    "ignoreBoundaryChecksPassed": 8,
+    "publicationCheckoutNodeTestsPassed": 40
   }
 }

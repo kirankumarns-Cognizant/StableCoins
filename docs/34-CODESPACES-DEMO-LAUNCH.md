@@ -45,8 +45,10 @@ loopback; do not make PostgreSQL, LocalStack or Visa public. GitHub documents th
 ### Recover a missing-lockfile bootstrap failure
 
 If `npm ci` reports `EUSAGE` and a missing `package-lock.json`, update the
-checkout before retrying. The initial published snapshot omitted both npm
-lockfiles. Both locks are now committed and match their package manifests.
+checkout before retrying. The initial published snapshot omitted both npm package manifests and
+lockfiles because of inherited workspace ignore rules. Both manifests and locks
+are now committed; the locks match the manifests. The existing wallet generator
+Java source is also included. Generated CDK JavaScript remains excluded.
 From the repository root run each command only after the previous succeeds:
 
 ```bash

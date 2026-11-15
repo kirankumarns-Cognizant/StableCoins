@@ -73,3 +73,12 @@ artifacts/
 # Commit reproducible dependency locks for Codespaces bootstrap.
 !/frontend/package-lock.json
 !/infrastructure/package-lock.json
+
+# Build manifests are required source files, including in parent workspaces.
+!/frontend/package.json
+!/infrastructure/package.json
+
+# Retain wallet generator source; encrypted wallet files stay ignored.
+!scripts/generate-test-wallets/src/**/wallets/
+scripts/generate-test-wallets/src/**/wallets/*
+!scripts/generate-test-wallets/src/**/wallets/*.java
