@@ -1,0 +1,370 @@
+version: "3.9"
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Stablecoin Intelligent Payment Orchestration POC â€” Local Development Compose
+#
+# Usage:
+#   # Infrastructure only (database + LocalStack):
+#   docker compose up
+#
+#   # Infrastructure + all application services:
+#   docker compose --profile services up --build
+#
+#   # Single application service:
+#   docker compose --profile services up --build payment-service
+#
+# Environment:
+#   Copy .env.example to .env and set DB_PASSWORD before running.
+#   NEVER commit .env to source control.
+#
+# See ADR-010: Testcontainers + LocalStack for integration tests.
+# Application services run via Spring Boot in integration tests.
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+x-service-common: &service-common
+  networks:
+    - stablecoins-net
+  environment: &service-environment
+    SPRING_PROFILES_ACTIVE: local
+    # One history per owner in the dedicated local shared schema (ADR-007).
+    LOCAL_SCHEMA_BOOTSTRAP: "true"
+    DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/${DB_NAME:-stablecoin_poc}}
+    DB_USER: ${DB_USER:-${DB_USERNAME:-stablecoin}}
+    DB_PASSWORD: ${DB_PASSWORD:-local_dev_only}
+    LOCALSTACK_URL: ${LOCALSTACK_URL:-http://localstack:4566}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+    AWS_REGION: ${AWS_REGION:-us-east-1}
+    BLOCKCHAIN_MODE: MOCK
+    TESTNET_ENABLED: "false"
+    PAYMENT_SERVICE_PORT: "8080"
+    COMPLIANCE_QUOTE_SERVICE_PORT: "8081"
+    BLOCKCHAIN_SERVICE_PORT: "8082"
+    SETTLEMENT_LEDGER_SERVICE_PORT: "8083"
+    RECONCILIATION_SERVICE_PORT: "8084"
+    VISA_SIMULATOR_PORT: "8086"
+    PAYMENT_SERVICE_URL: ${PAYMENT_SERVICE_URL:-http://payment-service:8080}
+    COMPLIANCE_QUOTE_SERVICE_URL: ${COMPLIANCE_QUOTE_SERVICE_URL:-http://compliance-quote-service:8081}
+    BLOCKCHAIN_SERVICE_URL: ${BLOCKCHAIN_SERVICE_URL:-http://blockchain-service:8082}
+    SETTLEMENT_LEDGER_SERVICE_URL: ${SETTLEMENT_LEDGER_SERVICE_URL:-http://settlement-ledger-service:8083}
+    RECONCILIATION_SERVICE_URL: ${RECONCILIATION_SERVICE_URL:-http://reconciliation-service:8084}
+    VISA_SIMULATOR_INTERNAL_URL: ${VISA_SIMULATOR_INTERNAL_URL:-http://visa-simulator:8086}
+    # Optional overrides are omitted when unset, preserving shared-file defaults.
+    SCHEDULING_POOL_SIZE:
+    FLOW_SIMULATED_FX_USD:
+    FLOW_SIMULATED_FX_INR:
+    VISA_SIMULATOR_PAYOUT_SCENARIO:
+    VISA_SIMULATOR_OPERATIONS_ENABLED:
+    SQS_RECEIPT_OBSERVED_QUEUE_NAME:
+    SQS_RECEIPT_OBSERVED_DLQ_NAME:
+    SQS_SETTLEMENT_REQUESTED_QUEUE_NAME:
+    SQS_SETTLEMENT_REQUESTED_DLQ_NAME:
+    SQS_VISA_PAYOUT_QUEUE_NAME:
+    SQS_VISA_PAYOUT_DLQ_NAME:
+    SQS_LEDGER_PAYOUT_QUEUE_NAME:
+    SQS_LEDGER_PAYOUT_DLQ_NAME:
+    SQS_RECONCILIATION_REQUESTED_QUEUE_NAME:
+    SQS_RECONCILIATION_REQUESTED_DLQ_NAME:
+    PAYMENT_FLOW_ENABLED:
+    PAYMENT_EXECUTION_ENABLED:
+    PAYMENT_FLOW_POLL_MS:
+    FLOW_PROVIDER_B_FEE_USD:
+    FLOW_PROVIDER_B_LATENCY_MS:
+    FLOW_PROVIDER_B_AVAILABLE:
+    FLOW_SIMULATION_VERSION:
+    FLOW_SIMULATION_PROVIDER_IDS:
+    FLOW_QUOTE_TTL:
+    FLOW_SIMULATED_FEE_USD:
+    FLOW_SIMULATED_COMPLETED:
+    FLOW_SIMULATED_ATTEMPTS:
+    FLOW_SIMULATED_LATENCY_MS:
+    FLOW_SIMULATED_FRAUD_SCORE:
+    FLOW_SIMULATED_AVAILABLE:
+    FLOW_SIMULATED_ETH_USD_BUDGET:
+    SQS_FLOW_QUOTE_QUEUE_NAME:
+    SQS_FLOW_QUOTE_DLQ_NAME:
+    SQS_FLOW_TREASURY_QUEUE_NAME:
+    SQS_FLOW_TREASURY_DLQ_NAME:
+    SQS_FLOW_VALIDATION_QUEUE_NAME:
+    SQS_FLOW_VALIDATION_DLQ_NAME:
+    SQS_FLOW_RESERVATION_QUEUE_NAME:
+    SQS_FLOW_RESERVATION_DLQ_NAME:
+    SQS_FLOW_SUBMISSION_QUEUE_NAME:
+    SQS_FLOW_SUBMISSION_DLQ_NAME:
+    PAYMENT_FLOW_PREPARATION_TIMEOUT_SECONDS:
+    AI_API_KEY_SECRET_NAME:
+    AI_PROVIDER:
+    AI_AUTH_MODE:
+    AI_REGION:
+    AI_BASE_URL:
+    AI_MODEL:
+    AI_TIMEOUT_MS:
+    LEDGER_ACCOUNTING_POLICY_VERSION:
+    LEDGER_MANUAL_API_ENABLED:
+    LEDGER_ACCOUNT_CORPORATE_USD:
+    LEDGER_ACCOUNT_FUNDING_USD:
+    LEDGER_ACCOUNT_CONVERSION_USD:
+    LEDGER_ACCOUNT_ALLOCATION_USDC:
+    LEDGER_ACCOUNT_TREASURY_USDC:
+    LEDGER_ACCOUNT_TRANSIT_USDC:
+    LEDGER_ACCOUNT_BENEFICIARY_USDC:
+    LEDGER_ACCOUNT_GAS_EXPENSE_ETH:
+    LEDGER_ACCOUNT_GAS_CLEARING_ETH:
+    LEDGER_ACCOUNT_PROVIDER_USD:
+    LEDGER_ACCOUNT_PAYABLE_USD:
+    LEDGER_ACCOUNT_PROVIDER_INR:
+    LEDGER_ACCOUNT_PAYABLE_INR:
+    ROUTING_AGENT_ENABLED:
+    ROUTING_AGENT_ALLOWED_CUSTOMER_IDS:
+    ROUTING_AGENT_MAXIMUM_ROUNDS:
+    ROUTING_AGENT_MAXIMUM_TOOL_CALLS:
+    ROUTING_AGENT_MAXIMUM_OUTPUT_TOKENS:
+    ROUTING_AGENT_MAXIMUM_TOTAL_TOKENS:
+    ROUTING_AGENT_MAXIMUM_REQUEST_BYTES:
+    ROUTING_AGENT_MAXIMUM_RESPONSE_BYTES:
+    ROUTING_AGENT_MAXIMUM_CONCURRENT_RUNS:
+    ROUTING_AGENT_MAXIMUM_RUNS_PER_PAYMENT:
+    ROUTING_AGENT_DEADLINE_MS:
+    ROUTING_AGENT_MAXIMUM_INFERENCE_COST_USD:
+    ROUTING_AGENT_INPUT_USD_PER_MILLION:
+    ROUTING_AGENT_OUTPUT_USD_PER_MILLION:
+    BLOCKCHAIN_CHAIN_ID:
+    BLOCKCHAIN_CONFIRMATIONS_REQUIRED:
+    BLOCKCHAIN_EXPLORER_BASE_URL:
+    BLOCKCHAIN_EXPLORER_URL:
+    BLOCKCHAIN_MOCK_RPC_URL:
+    BLOCKCHAIN_NETWORK:
+    BLOCKCHAIN_RPC_CONNECT_TIMEOUT_MS:
+    BLOCKCHAIN_RPC_READ_TIMEOUT_MS:
+    BLOCKCHAIN_RPC_URL:
+    BLOCKCHAIN_TOKEN_CONTRACT:
+    BLOCKCHAIN_TOKEN_DECIMALS:
+    BLOCKCHAIN_TOKEN_SYMBOL:
+    BLOCKCHAIN_WALLET_SECRET_NAME:
+    COGNITO_APP_CLIENT_ID:
+    COGNITO_ISSUER_URI:
+    DB_HOST:
+    DB_NAME:
+    DB_POOL_SIZE:
+    DB_PORT:
+    DB_USERNAME:
+    EVENTBRIDGE_BUS_NAME:
+    IDENTITY_AUDIENCE:
+    IDENTITY_AUTHORIZATION_URI:
+    IDENTITY_CLIENT_ID:
+    IDENTITY_SERVICE_CLIENT_ID:
+    IDENTITY_SERVICE_SCOPE:
+    IDENTITY_ISSUER_URI:
+    IDENTITY_HTTP_TIMEOUT_MS:
+    IDENTITY_JWK_SET_URI:
+    IDENTITY_PROVIDER:
+    IDENTITY_REDIRECT_URI:
+    IDENTITY_SCOPES:
+    IDENTITY_TOKEN_URI:
+    LOCALSTACK_ACCOUNT_ID:
+    PUBLIC_API_BASE_URL:
+    SQS_BLOCKCHAIN_CONFIRMED_QUEUE_NAME:
+    SQS_LEDGER_FUNDING_QUEUE_NAME:
+    SQS_LEDGER_FUNDING_DLQ_NAME:
+    SQS_BLOCKCHAIN_SUBMITTED_DLQ_NAME:
+    SQS_BLOCKCHAIN_CONFIRMED_DLQ_NAME:
+    SQS_BLOCKCHAIN_SUBMITTED_QUEUE_NAME:
+    SQS_COMPLIANCE_COMPLETED_DLQ_NAME:
+    SQS_COMPLIANCE_COMPLETED_QUEUE_NAME:
+    SQS_PAYMENT_CREATED_DLQ_NAME:
+    SQS_ROUTING_DECISIONS_QUEUE_NAME:
+    SQS_ROUTING_DECISIONS_DLQ_NAME:
+    SQS_PAYMENT_CREATED_QUEUE_NAME:
+    BLOCKCHAIN_RESERVATION_TTL:
+    BLOCKCHAIN_READINESS_TTL:
+    BLOCKCHAIN_GAS_LIMIT_MULTIPLIER:
+    BLOCKCHAIN_GAS_PRICE_MULTIPLIER:
+    BLOCKCHAIN_ADDITIONAL_GAS_RESERVE_ETH:
+    BLOCKCHAIN_EXECUTION_API_ENABLED:
+    VISA_SIMULATOR_ALLOWED_PROVIDER_IDS:
+    VISA_SIMULATOR_RESERVATION_TTL:
+    ROUTING_ASSESSMENT_VERSION:
+    ROUTING_MAXIMUM_EVIDENCE_AGE:
+    ROUTING_HISTORICAL_WINDOW:
+    ROUTING_MINIMUM_SAMPLE_SIZE:
+    ROUTING_LATENCY_PERCENTILE:
+    ROUTING_MINIMUM_SUCCESS_RATE:
+    ROUTING_MAXIMUM_FRAUD_SCORE:
+    ROUTING_MAXIMUM_PRICE_DEVIATION_BPS:
+    ROUTING_MAXIMUM_CANDIDATES:
+    ROUTING_MAXIMUM_OBSERVATIONS:
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    CONNECTIONS_CONFIG: file:/app/config/connections.properties
+  volumes:
+    - ${CONNECTIONS_CONFIG_FILE:-./services/config/connections.properties}:/app/config/connections.properties:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    localstack:
+      condition: service_healthy
+  restart: on-failure
+
+services:
+
+  # â”€â”€ Infrastructure â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: stablecoins-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-stablecoin_poc}
+      POSTGRES_USER: ${DB_USERNAME:-stablecoin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-local_dev_only}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - stablecoins-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-stablecoin} -d ${DB_NAME:-stablecoin_poc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: stablecoins-localstack
+    environment:
+      SERVICES: sqs,events
+      DEFAULT_REGION: us-east-1
+      DEBUG: "0"
+    ports:
+      - "127.0.0.1:4566:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+    networks:
+      - stablecoins-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # â”€â”€ Application services (profile: services) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # Images are built from services/ using the per-service Dockerfiles.
+  # Build command: docker compose --profile services up --build
+
+  payment-service:
+    build:
+      context: ./services
+      dockerfile: payment-service/Dockerfile
+    image: stablecoins/payment-service:latest
+    container_name: stablecoins-payment-service
+    profiles: [services]
+    <<: *service-common
+    ports:
+      - "127.0.0.1:${PAYMENT_SERVICE_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  compliance-quote-service:
+    build:
+      context: ./services
+      dockerfile: compliance-quote-service/Dockerfile
+    image: stablecoins/compliance-quote-service:latest
+    container_name: stablecoins-compliance-quote-service
+    profiles: [services]
+    <<: *service-common
+    ports:
+      - "127.0.0.1:${COMPLIANCE_QUOTE_SERVICE_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  blockchain-service:
+    build:
+      context: ./services
+      dockerfile: blockchain-service/Dockerfile
+    image: stablecoins/blockchain-service:latest
+    container_name: stablecoins-blockchain-service
+    profiles: [services]
+    <<: *service-common
+    environment:
+      <<: *service-environment
+      # Local testnet signing key is passed only to this container.
+      BLOCKCHAIN_WALLET_PRIVATE_KEY:
+    ports:
+      - "127.0.0.1:${BLOCKCHAIN_SERVICE_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  settlement-ledger-service:
+    build:
+      context: ./services
+      dockerfile: settlement-ledger-service/Dockerfile
+    image: stablecoins/settlement-ledger-service:latest
+    container_name: stablecoins-settlement-ledger-service
+    profiles: [services]
+    <<: *service-common
+    ports:
+      - "127.0.0.1:${SETTLEMENT_LEDGER_SERVICE_PORT:-8083}:8083"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  reconciliation-service:
+    build:
+      context: ./services
+      dockerfile: reconciliation-service/Dockerfile
+    image: stablecoins/reconciliation-service:latest
+    container_name: stablecoins-reconciliation-service
+    profiles: [services]
+    <<: *service-common
+    ports:
+      - "127.0.0.1:${RECONCILIATION_SERVICE_PORT:-8084}:8084"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  visa-simulator:
+    build:
+      context: ./services
+      dockerfile: visa-simulator/Dockerfile
+    image: stablecoins/visa-simulator:latest
+    container_name: stablecoins-visa-simulator
+    profiles: [services]
+    <<: *service-common
+    ports:
+      # Internal VPC only in production (ADR-009). Port exposed locally for dev.
+      - "127.0.0.1:${VISA_SIMULATOR_PORT:-8086}:8086"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  postgres-data:
+    driver: local
+  localstack-data:
+    driver: local
+
+networks:
+  stablecoins-net:
+    driver: bridge

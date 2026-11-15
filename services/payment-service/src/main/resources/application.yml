@@ -1,0 +1,27 @@
+spring:
+  config:
+    import: "classpath:connections.properties,${CONNECTIONS_CONFIG:optional:file:./config/connections-local.properties}"
+  application:
+    name: payment-service
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history_payment
+app:
+  outbox:
+    poll-interval-ms: 5000
+  eventbridge:
+    source: stablecoins.payment-service
+
+server:
+  port: ${PAYMENT_SERVICE_PORT:8080}
+
+logging:
+  level:
+    com.cognizant.stablecoins: ${LOG_LEVEL:INFO}

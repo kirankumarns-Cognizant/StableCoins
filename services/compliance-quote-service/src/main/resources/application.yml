@@ -1,0 +1,27 @@
+spring:
+  config:
+    import: "classpath:connections.properties,${CONNECTIONS_CONFIG:optional:file:./config/connections-local.properties}"
+  application:
+    name: compliance-quote-service
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history_compliance
+app:
+  outbox:
+    poll-interval-ms: 5000
+  eventbridge:
+    source: stablecoins.compliance-quote-service
+
+server:
+  port: ${COMPLIANCE_QUOTE_SERVICE_PORT:8081}
+
+logging:
+  level:
+    com.cognizant.stablecoins: ${LOG_LEVEL:INFO}

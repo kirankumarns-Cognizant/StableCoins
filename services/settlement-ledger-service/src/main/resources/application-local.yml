@@ -1,0 +1,10 @@
+# local profile — Testcontainers (PostgreSQL) + LocalStack (SQS/EventBridge)
+# See ADR-010. Database and messaging config added in Iteration 2 and 3.
+
+# LocalStack credentials apply only to the local profile; AWS uses the default provider chain.
+spring:
+  cloud:
+    aws:
+      credentials:
+        access-key: ${connections.aws.local-access-key}
+        secret-key: ${connections.aws.local-secret-key}

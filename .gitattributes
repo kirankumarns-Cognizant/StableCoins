@@ -1,0 +1,5 @@
+
+# Linux container entry points must survive a Windows checkout with LF endings.
+*.sh text eol=lf
+services/mvnw text eol=lf
+**/Dockerfile text eol=lf

@@ -1,0 +1,7 @@
+# aws-dev profile — shared AWS dev account
+# blockchain.mode defaults to MOCK unless explicitly overridden.
+blockchain:
+  mode: ${BLOCKCHAIN_MODE:MOCK}
+
+testnet:
+  enabled: ${TESTNET_ENABLED:false}

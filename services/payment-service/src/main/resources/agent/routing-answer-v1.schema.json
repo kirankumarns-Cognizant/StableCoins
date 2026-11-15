@@ -1,0 +1,186 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "RECOMMENDED",
+        "NO_ELIGIBLE_ROUTE",
+        "INSUFFICIENT_EVIDENCE",
+        "CLARIFICATION_REQUIRED"
+      ]
+    },
+    "selectedCandidateId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "explanations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "SUCCESS_RATE",
+              "LATENCY",
+              "TRANSACTION_COST",
+              "FRAUD_RISK",
+              "RAIL_AVAILABILITY",
+              "LIQUIDITY",
+              "EXTERNAL_DATA"
+            ]
+          },
+          "signalIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "candidateId",
+          "topic",
+          "signalIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "clarificationCodes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "AMBIGUOUS_INSTRUCTION",
+          "CONFLICTS_WITH_CONFIRMED_INTENT",
+          "OUTCOME_CHOICE_REQUIRED"
+        ]
+      }
+    },
+    "intentDraft": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sourceAmountUsd": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requiredOutcome": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "USDC_WALLET",
+                "SIMULATED_BANK_USD",
+                "SIMULATED_BANK_INR",
+                null
+              ]
+            },
+            "deliverBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "maximumFeeUsd": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "priority": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "LOWEST_COST",
+                "MEET_DEADLINE",
+                null
+              ]
+            },
+            "allowedAlternatives": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "USDC_WALLET",
+                  "SIMULATED_BANK_USD",
+                  "SIMULATED_BANK_INR"
+                ]
+              }
+            },
+            "confirmed": {
+              "type": "boolean",
+              "enum": [
+                false
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "SOURCE_AMOUNT_USD",
+                      "REQUIRED_OUTCOME",
+                      "DELIVER_BY",
+                      "MAXIMUM_FEE_USD",
+                      "PRIORITY",
+                      "ALLOWED_ALTERNATIVE"
+                    ]
+                  },
+                  "start": {
+                    "type": "integer"
+                  },
+                  "end": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "field",
+                  "start",
+                  "end"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "sourceAmountUsd",
+            "requiredOutcome",
+            "deliverBy",
+            "maximumFeeUsd",
+            "priority",
+            "allowedAlternatives",
+            "confirmed",
+            "evidence"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "required": [
+    "outcome",
+    "selectedCandidateId",
+    "explanations",
+    "clarificationCodes",
+    "intentDraft"
+  ],
+  "additionalProperties": false
+}

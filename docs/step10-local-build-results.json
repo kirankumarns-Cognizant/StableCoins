@@ -1,0 +1,141 @@
+{
+  "date": "2026-11-15",
+  "scope": "STEP_10_LOCAL_FIRST_INCREMENT",
+  "step10Complete": false,
+  "completedSteps": 9,
+  "totalSteps": 11,
+  "localCodeVerification": "PASSED_WITH_SKIPS",
+  "actualRun": ".local/validation/1794729231075-24804-verify/report.json",
+  "java": {
+    "tests": 602,
+    "passed": 555,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 47
+  },
+  "skippedJavaSuites": [
+    {
+      "name": "com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest",
+      "skipped": 1
+    },
+    {
+      "name": "com.cognizant.stablecoins.payment.agent.AgentRunPersistenceIT",
+      "skipped": 4
+    },
+    {
+      "name": "com.cognizant.stablecoins.payment.api.PaymentApiIT",
+      "skipped": 9
+    },
+    {
+      "name": "com.cognizant.stablecoins.payment.approval.RecommendationPersistenceIT",
+      "skipped": 5
+    },
+    {
+      "name": "com.cognizant.stablecoins.payment.flow.PaymentFlowPersistenceIT",
+      "skipped": 3
+    },
+    {
+      "name": "com.cognizant.stablecoins.payment.integration.PaymentIntentPersistenceIT",
+      "skipped": 1
+    },
+    {
+      "name": "com.cognizant.stablecoins.ledger.integration.LedgerServiceIT",
+      "skipped": 10
+    },
+    {
+      "name": "com.cognizant.stablecoins.reconciliation.flow.ReconciliationPersistenceIT",
+      "skipped": 4
+    },
+    {
+      "name": "com.cognizant.stablecoins.visa.liquidity.ProviderLiquidityPersistenceIT",
+      "skipped": 10
+    }
+  ],
+  "databaseGate": "NOT_SATISFIED",
+  "node": {
+    "passed": 54,
+    "failed": 0,
+    "skipped": 0
+  },
+  "infrastructure": {
+    "testSuitesPassed": 2,
+    "testsPassed": 12,
+    "testsFailed": 0,
+    "typescriptBuild": "PASSED",
+    "awsDeploymentExecuted": false
+  },
+  "frontend": {
+    "build": "PASSED",
+    "lint": "PASSED",
+    "browserSmokeRerun": false
+  },
+  "documentation": {
+    "markdownFilesChecked": 64,
+    "brokenLocalFileLinks": 0,
+    "unclosedCodeFences": 0
+  },
+  "packages": [
+    {
+      "service": "payment-service",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    },
+    {
+      "service": "compliance-quote-service",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    },
+    {
+      "service": "blockchain-service",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    },
+    {
+      "service": "settlement-ledger-service",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    },
+    {
+      "service": "reconciliation-service",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    },
+    {
+      "service": "visa-simulator",
+      "currentSharedConfiguration": true,
+      "sharedSecurityLibrary": true
+    }
+  ],
+  "prerequisitesWithJava21": {
+    "node": true,
+    "java21": true,
+    "docker": false,
+    "compose": false,
+    "dependencies": true
+  },
+  "localStackStartup": {
+    "status": "BLOCKED_BEFORE_COMPOSE",
+    "reason": "Docker and Compose unavailable",
+    "applicationContainersStarted": false
+  },
+  "liveAcceptance": false,
+  "liveIdentityExecuted": false,
+  "liveModelExecuted": false,
+  "publicTestnetExecuted": false,
+  "resolvedToolingIssues": [
+    "Resolve Windows npm batch wrappers to their absolute PATH location.",
+    "Remove inherited blockchain activation flags for verification rather than masking configuration unit-test inputs."
+  ],
+  "assumptions": [
+    "Dedicated local POC database only.",
+    "Cognito and server-owned memberships remain authoritative.",
+    "Separate owner Flyway histories and immutable per-asset ledger remain unchanged."
+  ],
+  "remaining": [
+    "Docker-backed PostgreSQL tests and actual six-service startup.",
+    "Authenticated MOCK wallet and simulated bank-payment acceptance.",
+    "Explicit live model and independently verified public-testnet evidence.",
+    "Deferred complete AWS deployment and operational readiness after local acceptance.",
+    "Step 11 commercial/hackathon evidence package and cumulative Word architecture/design document."
+  ]
+}

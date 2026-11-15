@@ -1,0 +1,68 @@
+# ── Version control ───────────────────────────────────────────────────────────
+.git
+.github
+.gitignore
+
+# ── IDE and editor ────────────────────────────────────────────────────────────
+.vscode
+.idea
+*.iml
+*.ipr
+*.iws
+
+# ── Build outputs (never copy into image) ────────────────────────────────────
+**/target
+**/node_modules
+**/dist
+**/build
+**/coverage
+cdk.out
+
+# ── Secrets — MUST NEVER enter Docker build context ─────────────────────────
+# AWS credentials
+.aws
+**/.aws
+**/credentials
+**/aws_credentials
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+wallets/
+
+# Environment files — .env.example is allowed, real .env files are not
+.env
+.env.*
+!.env.example
+
+# Blockchain private keys
+**/*private_key*
+**/*privatekey*
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS artefacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Test artefacts ───────────────────────────────────────────────────────────
+test-results/
+**/surefire-reports
+**/failsafe-reports
+
+# ── Documentation source (not needed in image) ────────────────────────────────
+docs/
+adr/
+prompts/
+*.md
+
+# ── CDK / Terraform ───────────────────────────────────────────────────────────
+infrastructure/
+.terraform/
+*.tfstate
+*.tfstate.*

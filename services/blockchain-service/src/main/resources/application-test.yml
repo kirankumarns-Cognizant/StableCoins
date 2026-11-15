@@ -1,0 +1,11 @@
+# test profile — unit tests, mocked RPC provider (ADR-010)
+server:
+  port: 0
+
+blockchain:
+  mode: MOCK
+  network: base-sepolia
+  chainId: 84532
+
+testnet:
+  enabled: false

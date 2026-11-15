@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-15",
+  "status": "PREPARATION_IN_PROGRESS",
+  "deliveryOrder": "Step 11 preparation and Codespaces acceptance before AWS application deployment",
+  "githubRepository": "kirankumarns-Cognizant/StableCoins",
+  "aws": {
+    "accountId": "640237069320",
+    "applicationRegion": "us-east-1",
+    "authentication": "IAM_IDENTITY_CENTER",
+    "ssoRegionConfirmed": false,
+    "permissionSetConfirmed": false,
+    "deployed": false
+  },
+  "executedChecks": {
+    "node": {
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0,
+      "command": "node --test scripts/local-workbench.test.cjs scripts/run-wallet-flow.test.cjs services/config/read-connections.test.cjs"
+    },
+    "markdown": {
+      "exportFiles": 66,
+      "brokenLocalLinks": 0,
+      "unclosedFences": 0
+    },
+    "customerExample": "Six distinct placeholders, operator/approver separation and both two-approval thresholds checked"
+  },
+  "notExecuted": [
+    "SQL seed execution against PostgreSQL",
+    "Codespaces container startup/database acceptance",
+    "Cognito provisioning and sign-in",
+    "Real model inference",
+    "Public-testnet payment",
+    "Two-customer and provider-disruption connected demonstrations",
+    "Word generation/render/page inspection",
+    "AWS application deployment"
+  ],
+  "architectureChanges": false,
+  "codeCompleteSteps": 9,
+  "totalSteps": 11
+}

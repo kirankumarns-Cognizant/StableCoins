@@ -1,0 +1,140 @@
+{
+  // ── Stablecoin POC — GitHub Codespaces / Dev Container ───────────────────
+  // Java 21 is the approved architecture (AGENTS.md, CLAUDE.md).
+  // Do NOT change java version to 17 or 25.
+  //
+  // This configuration provides:
+  //   - Java 21 (Microsoft OpenJDK via ms-vscode.java feature)
+  //   - Maven support (via java feature)
+  //   - Node.js LTS (for React / Vite frontend)
+  //   - AWS CLI
+  //   - GitHub CLI
+  //   - Docker-in-Docker (required by Testcontainers — ADR-010)
+  //
+  // Codespaces Secrets (set in repo Settings → Codespaces secrets):
+  //   BLOCKCHAIN_RPC_URL, BLOCKCHAIN_TOKEN_CONTRACT,
+  //   BLOCKCHAIN_WALLET_SECRET_NAME, DB_PASSWORD (if non-default)
+  //   Prefer IAM Identity Center for human AWS access; do not store permanent AWS keys.
+  //   See docs/34-CODESPACES-DEMO-LAUNCH.md for container credential boundaries.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "name": "Stablecoin POC",
+
+  // Use the universal dev container image as the base.
+  // docker-in-docker is added via features below.
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+  "features": {
+    // Java 21 — Microsoft OpenJDK build (matches production runtime).
+    // installGradle: false — project uses Maven only.
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "jdkDistribution": "ms",
+      "installMaven": true,
+      "installGradle": false
+    },
+
+    // Node.js LTS — required for React/Vite frontend and CDK TypeScript.
+    // Pin to Node 22 LTS (even-numbered = long-term support).
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+
+    // AWS CLI v2 — required for CDK and Secrets Manager access.
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+
+    // GitHub CLI — PR/issue management from terminal.
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+
+    // Docker-in-Docker — REQUIRED for Testcontainers (ADR-010).
+    // Provides a working Docker daemon inside the Codespace.
+    // Without this, Testcontainers cannot start PostgreSQL containers.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "dockerDaemonGraph": "/var/lib/docker",
+      "moby": true
+    }
+  },
+
+  // VS Code extensions installed automatically in the Codespace.
+  // Covers: Java, Spring Boot, Maven, Docker, TypeScript/React.
+  // Claude Code is NOT included — it is a user choice (see CLAUDE.md).
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Java development
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-spring-initializr",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-maven",
+
+        // Docker and containers
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+
+        // TypeScript and React
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+
+        // AWS CDK
+        "amazonwebservices.aws-toolkit-vscode",
+
+        // General productivity
+        "eamodio.gitlens",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools"
+      ],
+      "settings": {
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-21",
+            "path": "/usr/local/sdkman/candidates/java/current",
+            "default": true
+          }
+        ],
+        "java.jdt.ls.java.home": "/usr/local/sdkman/candidates/java/current",
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  // Post-create script runs once when the Codespace is first created.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // Forward the service ports for local testing.
+  "forwardPorts": [
+    5432,  // PostgreSQL
+    4566,  // LocalStack
+    8080,  // payment-service
+    8081,  // compliance-quote-service
+    8082,  // blockchain-service
+    8083,  // settlement-ledger-service
+    8084,  // reconciliation-service
+    8086,  // visa-simulator
+    5173   // Vite dev server
+  ],
+
+  // Port display labels
+  "portsAttributes": {
+    "5432":  { "label": "PostgreSQL",                "onAutoForward": "silent" },
+    "4566":  { "label": "LocalStack",                "onAutoForward": "silent" },
+    "8080":  { "label": "payment-service",           "onAutoForward": "notify" },
+    "8081":  { "label": "compliance-quote-service",  "onAutoForward": "notify" },
+    "8082":  { "label": "blockchain-service",        "onAutoForward": "notify" },
+    "8083":  { "label": "settlement-ledger-service", "onAutoForward": "notify" },
+    "8084":  { "label": "reconciliation-service",    "onAutoForward": "notify" },
+    "8086":  { "label": "visa-simulator",            "onAutoForward": "notify" },
+    "5173":  { "label": "Vite dev server",           "onAutoForward": "openBrowser" }
+  },
+
+  // Environment variables available in every terminal and task.
+  // These are non-sensitive defaults; real secrets go in Codespaces Secrets.
+  "remoteEnv": {
+    "JAVA_HOME": "/usr/local/sdkman/candidates/java/current",
+    "SPRING_PROFILES_ACTIVE": "local",
+    "BLOCKCHAIN_MODE": "MOCK",
+    "TESTNET_ENABLED": "false",
+    "ROUTING_AGENT_ENABLED": "false"
+  }
+}

@@ -1,0 +1,6 @@
+# Explicit profile and two flags are required after a local profile's MOCK guard.
+# Connection endpoints and network tuple remain in connections.properties.
+blockchain:
+  mode: ${BLOCKCHAIN_MODE:MOCK}
+testnet:
+  enabled: ${TESTNET_ENABLED:false}

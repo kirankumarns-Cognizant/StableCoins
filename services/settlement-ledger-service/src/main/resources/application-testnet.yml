@@ -1,0 +1,2 @@
+# testnet profile — real Base Sepolia (ADR-010, ADR-011)
+# Requires BLOCKCHAIN_MODE=REAL_TESTNET and TESTNET_ENABLED=true

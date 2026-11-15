@@ -1,0 +1,2 @@
+# aws-dev profile — deployed internally in VPC (ADR-009)
+# Not exposed through API Gateway. Accessible only to payment-service within VPC.

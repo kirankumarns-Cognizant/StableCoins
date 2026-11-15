@@ -1,0 +1,129 @@
+{
+  "date": "2026-11-15",
+  "scope": "Latest full Java reactor verify plus targeted blockchain verification; each module/test class counted once.",
+  "java": {
+    "tests": 600,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 54,
+    "passed": 546,
+    "modules": {
+      "blockchain-service": {
+        "tests": 96,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 7
+      },
+      "compliance-quote-service": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "payment-service": {
+        "tests": 318,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 23
+      },
+      "platform-flow": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "platform-security": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "reconciliation-service": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4
+      },
+      "settlement-ledger-service": {
+        "tests": 89,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 10
+      },
+      "visa-simulator": {
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 10
+      }
+    },
+    "skips": [
+      {
+        "class": "com.cognizant.stablecoins.blockchain.integration.BlockchainServiceIT",
+        "skipped": 2
+      },
+      {
+        "class": "com.cognizant.stablecoins.blockchain.integration.TreasuryReservationPersistenceIT",
+        "skipped": 5
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest",
+        "skipped": 1
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.api.PaymentApiIT",
+        "skipped": 9
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.approval.RecommendationPersistenceIT",
+        "skipped": 5
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.integration.PaymentIntentPersistenceIT",
+        "skipped": 1
+      },
+      {
+        "class": "com.cognizant.stablecoins.visa.liquidity.ProviderLiquidityPersistenceIT",
+        "skipped": 10
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.agent.AgentRunPersistenceIT",
+        "skipped": 4
+      },
+      {
+        "class": "com.cognizant.stablecoins.payment.flow.PaymentFlowPersistenceIT",
+        "skipped": 3
+      },
+      {
+        "class": "com.cognizant.stablecoins.reconciliation.flow.ReconciliationPersistenceIT",
+        "skipped": 4
+      },
+      {
+        "class": "com.cognizant.stablecoins.ledger.integration.LedgerServiceIT",
+        "skipped": 10
+      }
+    ]
+  },
+  "node": {
+    "passed": 30,
+    "failed": 0
+  },
+  "cdk": {
+    "passed": 11,
+    "failed": 0,
+    "typescriptBuild": "PASSED"
+  },
+  "unexecuted": [
+    "Docker images and PostgreSQL integration execution",
+    "Live Cognito identity flow",
+    "Live configured model evaluation",
+    "AWS deployment",
+    "Public testnet end-to-end transfer"
+  ],
+  "assumptions": [
+    "Six existing deployable services and accepted ADR-007/008/014/015",
+    "Notional USD/USDC 1:1; illustrative configured INR rate",
+    "Fiat funding/conversion/compliance/FX/Visa/bank credit simulated",
+    "Connected React UI remains step 9; final Word architecture document remains step 11"
+  ]
+}

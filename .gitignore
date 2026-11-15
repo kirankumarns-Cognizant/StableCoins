@@ -1,0 +1,71 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+wallets/
+
+# Local developer workspace — generated wallet files and other local-only state.
+# NEVER commit anything under .local/
+.local/
+.local/wallets/
+*.wallet.json
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.ipr
+*.iws
+*.factorypath
+.classpath
+.project
+.settings/
+
+# Maven wrapper cache (downloaded by mvnw, not committed)
+services/.m2/
+
+# IDE
+.vscode/settings.local.json
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AWS
+.aws-sam/
+
+# CDK
+cdk.out/
+
+# Logs
+*.log
+logs/
+
+# Terraform if introduced later
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Test artifacts that could contain sensitive data
+test-results/
+# Uncommitted deployment-specific connection overrides
+connections-local.properties
+
+# Local demonstration evidence may contain customer/account metadata.
+artifacts/

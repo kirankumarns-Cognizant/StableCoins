@@ -1,0 +1,2 @@
+# local profile — Testcontainers (PostgreSQL) + LocalStack (SQS/EventBridge)
+# See ADR-010. Database and messaging config added in Iteration 2 and 3.

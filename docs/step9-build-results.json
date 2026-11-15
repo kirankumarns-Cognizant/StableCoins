@@ -1,0 +1,176 @@
+{
+  "date": "2026-11-15",
+  "step": 9,
+  "status": "VERIFIED_CODE_COMPLETE",
+  "scope": "Connected React workspace and customer-authorized read projections. Local unit/security/synthetic browser checks; no live financial acceptance claim.",
+  "java": {
+    "fullReactorVerify": {
+      "tests": 602,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 47,
+      "passed": 555
+    },
+    "modules": {
+      "blockchain-service": {
+        "tests": 89,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "compliance-quote-service": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "payment-service": {
+        "tests": 327,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 23
+      },
+      "platform-flow": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "platform-security": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "reconciliation-service": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4
+      },
+      "settlement-ledger-service": {
+        "tests": 89,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 10
+      },
+      "visa-simulator": {
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 10
+      }
+    },
+    "skipScope": "46 Docker/database cases and one opt-in model evaluation did not execute in this full run.",
+    "combinedLatestReportsIncludingPreviouslyTargetedBlockchain": {
+      "tests": 609,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 54,
+      "passed": 555
+    },
+    "historicalScope": "The combined count includes seven previously discovered/skipped blockchain Docker cases; those seven did not execute in the step-9 full reactor."
+  },
+  "frontend": {
+    "productionBuild": "PASSED",
+    "lint": "PASSED",
+    "lintWarnings": 0,
+    "nodeTests": 45,
+    "nodePassed": 45,
+    "nodeFailures": 0,
+    "nodeSkipped": 0,
+    "nodeScope": "14 frontend API/auth/precision/idempotency tests plus 31 shared-configuration and lifecycle-runner tests."
+  },
+  "browser": {
+    "status": "PASSED",
+    "completedAt": "2026-11-15T07:02:06.200Z",
+    "synthetic": true,
+    "checks": 19,
+    "passed": [
+      "customer catalog loaded without a browser role selector",
+      "mutation was not automatically retried",
+      "successful reads retain unresolved command warning",
+      "uncertain create retried exact body and original key",
+      "no fabricated model recommendation before a run",
+      "actual agent record fields and seven signals rendered",
+      "treasury gas estimate carries captured mock evidence",
+      "operator cannot click approve",
+      "signout clears customer evidence synthetic-approver-a",
+      "signout clears customer evidence synthetic-approver-b",
+      "one execution requested after distinct approvals",
+      "mock chain is not advertised as public proof",
+      "ledger renders exact 18-decimal fee and per-asset result",
+      "wallet-only instruction does not invent a bank payout",
+      "access tokens absent from browser storage",
+      "public explorer link targets supported testnet safely",
+      "mobile layout has no document horizontal overflow",
+      "401 clears the entire customer view",
+      "no browser runtime exceptions"
+    ],
+    "liveSystemsExecuted": false
+  },
+  "packaging": {
+    "sharedConfigurationSha256": "8a2f301e1091507e4ad6125df81b98d89639c0eabe98ea5ff533e4b6fc3cf379",
+    "packages": [
+      {
+        "module": "payment-service",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      },
+      {
+        "module": "compliance-quote-service",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      },
+      {
+        "module": "blockchain-service",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      },
+      {
+        "module": "settlement-ledger-service",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      },
+      {
+        "module": "reconciliation-service",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      },
+      {
+        "module": "visa-simulator",
+        "commonConfigurationMatches": true,
+        "sharedFlowLibraryPresent": true
+      }
+    ]
+  },
+  "documentation": {
+    "status": "PASSED",
+    "markdownFilesChecked": 63,
+    "brokenRelativeFileLinks": 0,
+    "unclosedFences": 0
+  },
+  "notExecuted": [
+    "Docker/container images",
+    "PostgreSQL migrations/locking/concurrency and six-service acceptance",
+    "Live Cognito authorization-code flow",
+    "Real OpenAI or AWS Bedrock invocation",
+    "AWS deployment",
+    "Public-testnet transaction/end-to-end payment"
+  ],
+  "architectureAssumptions": [
+    "Existing accepted six-service architecture, shared-schema read ownership and per-asset operational ledger remain authoritative.",
+    "Financial commands reuse existing services; the model has read-only tools.",
+    "Only explicitly allowlisted public connection metadata enters the browser; service/RPC credentials remain private."
+  ],
+  "remainingDeliverySteps": [
+    {
+      "step": 10,
+      "scope": "Complete AWS deployment and operations"
+    },
+    {
+      "step": 11,
+      "scope": "Live proof, commercial/hackathon demonstration package and final cumulative Word architecture/design document"
+    }
+  ]
+}

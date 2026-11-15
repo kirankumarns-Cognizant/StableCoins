@@ -1,0 +1,15 @@
+# local profile — MOCK blockchain by default (ADR-010)
+# Real testnet requires application-testnet.yml with explicit flags.
+blockchain:
+  mode: MOCK
+
+testnet:
+  enabled: false
+
+# LocalStack credentials apply only to the local profile; AWS uses the default provider chain.
+spring:
+  cloud:
+    aws:
+      credentials:
+        access-key: ${connections.aws.local-access-key}
+        secret-key: ${connections.aws.local-secret-key}

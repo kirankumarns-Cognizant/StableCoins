@@ -1,0 +1,9 @@
+# Local connections are inherited from connections.properties. Set DB_* and LOCALSTACK_URL.
+
+# LocalStack credentials apply only to the local profile; AWS uses the default provider chain.
+spring:
+  cloud:
+    aws:
+      credentials:
+        access-key: ${connections.aws.local-access-key}
+        secret-key: ${connections.aws.local-secret-key}

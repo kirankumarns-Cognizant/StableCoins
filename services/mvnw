@@ -1,0 +1,32 @@
+#!/bin/sh
+# Maven Wrapper Script
+# Downloads Apache Maven 3.9.9 on first run if not already cached.
+# See .mvn/wrapper/maven-wrapper.properties
+
+set -e
+
+MAVEN_VERSION="3.9.9"
+WRAPPER_DIR="${HOME}/.m2/wrapper/dists/apache-maven-${MAVEN_VERSION}"
+MAVEN_HOME="${WRAPPER_DIR}/apache-maven-${MAVEN_VERSION}"
+MAVEN_BIN="${MAVEN_HOME}/bin/mvn"
+DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+
+if [ ! -f "${MAVEN_BIN}" ]; then
+  printf 'Downloading Apache Maven %s to %s...\n' "${MAVEN_VERSION}" "${WRAPPER_DIR}"
+  mkdir -p "${WRAPPER_DIR}"
+
+  if command -v curl > /dev/null 2>&1; then
+    curl -fsSL "${DOWNLOAD_URL}" -o "${WRAPPER_DIR}/maven.tar.gz"
+  elif command -v wget > /dev/null 2>&1; then
+    wget -q -O "${WRAPPER_DIR}/maven.tar.gz" "${DOWNLOAD_URL}"
+  else
+    echo "ERROR: Neither curl nor wget is available. Install Apache Maven manually." >&2
+    exit 1
+  fi
+
+  tar -xzf "${WRAPPER_DIR}/maven.tar.gz" -C "${WRAPPER_DIR}"
+  rm -f "${WRAPPER_DIR}/maven.tar.gz"
+  printf 'Apache Maven %s installed at %s\n' "${MAVEN_VERSION}" "${MAVEN_HOME}"
+fi
+
+exec "${MAVEN_BIN}" "$@"

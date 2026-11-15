@@ -1,0 +1,35 @@
+package com.cognizant.stablecoins.payment.flow;
+import com.cognizant.stablecoins.flow.*;
+import com.cognizant.stablecoins.flow.FlowContract.*;
+import com.cognizant.stablecoins.flow.LifecycleReadModels.*;
+import com.cognizant.stablecoins.payment.model.Payment;
+import com.cognizant.stablecoins.payment.repository.PaymentRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.env.MockEnvironment;
+import java.math.*;
+import java.time.*;
+import java.util.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
+class PaymentClosureServiceTest {
+ final JdbcTemplate jdbc=mock(JdbcTemplate.class);final PaymentRepository payments=mock(PaymentRepository.class);final PaymentFlowService flow=mock(PaymentFlowService.class);final FlowReadModels reads=mock(FlowReadModels.class);final LifecycleReadModels lifecycle=mock(LifecycleReadModels.class);final ClosureEvidence checker=mock(ClosureEvidence.class);
+ final MockEnvironment env=new MockEnvironment().withProperty("app.flow.execution-enabled","true");final UUID id=UUID.randomUUID(),prep=UUID.randomUUID();final String hash="0x"+"a".repeat(64);final Instant now=Instant.now();
+ Execution e;Quote q;Chain chain;Payment p;PaymentClosureService service;
+ @BeforeEach void setup(){var request=new Request(prep,"PAY-1","CORR-1",UUID.randomUUID(),new BigDecimal("10000"),new BigDecimal("10000"),"0x"+"1".repeat(40),"USDC_WALLET","AUTO","DEMO",now.plusSeconds(300),Set.of("A"));e=new Execution(id,UUID.randomUUID(),prep,"PAY-1","CORR-1","CONFIRMED",request,UUID.randomUUID(),now.plusSeconds(300));q=new Quote(prep,UUID.randomUUID(),1,"A","v1",request.sourceUsd(),request.transferUsdc(),BigDecimal.ONE,99,100,1000,BigDecimal.ONE,true,now,now.plusSeconds(300));chain=new Chain(e.transactionId(),e.paymentId(),e.correlationId(),"base-sepolia",84532,"token","sender",request.recipientWallet(),request.transferUsdc(),hash,"CONFIRMED",100L,BigDecimal.ONE,BigDecimal.ONE,BigDecimal.ZERO,BigDecimal.ONE,true,null,"MOCK",1);p=new Payment();p.setPaymentId("PAY-1");p.setCorrelationId("CORR-1");p.setStatus("BLOCKCHAIN_CONFIRMED");when(reads.execution(id)).thenReturn(e);when(reads.quote(prep)).thenAnswer(i->Optional.of(new Stored<>("READY",q,null)));when(lifecycle.chain(e)).thenReturn(chain);when(payments.lockByPaymentId("PAY-1")).thenReturn(Optional.of(p));service=new PaymentClosureService(jdbc,new ObjectMapper(),env,payments,flow,reads,lifecycle,checker);}
+ void phase(String value){when(jdbc.queryForList(contains("select phase"),eq(String.class),eq(id))).thenReturn(List.of(value));}
+ void bank(){q=new Quote(q.requestId(),q.quoteId(),q.version(),q.providerId(),q.simulationVersion(),q.sourceUsd(),q.transferUsdc(),q.feeUsd(),q.completed(),q.attempts(),q.latencyMillis(),q.fraudScore(),q.available(),q.createdAt(),q.expiresAt(),"USD",new BigDecimal("10000"),BigDecimal.ONE,new BigDecimal("20000"));}
+ Payout payout(String status){return new Payout(UUID.randomUUID(),id,"PAY-1","CORR-1","A","USD",new BigDecimal("10000"),status,"SIMULATED-VISA-1",UUID.randomUUID(),q.quoteId(),1,hash,"SIMULATED",status.equals("UNKNOWN")?"TIMEOUT":"SUCCEEDED");}
+ @Test void confirmationRequestsSettlementRatherThanClaimingReconciliation(){service.advance(id);verify(flow).command(eq(p),eq("SettlementRequested"),eq(new Command(id)),eq("1.0"));verify(flow,never()).transition(any(),any(),any());}
+ @Test void missingSettlementNeverAdvancesBusinessState(){phase("SETTLEMENT_REQUESTED");when(lifecycle.settlement(e,chain)).thenReturn(Optional.empty());service.advance(id);verifyNoInteractions(flow);}
+ @Test void walletDoesNotRequestAnyFiatPayout(){phase("SETTLED");service.advance(id);verify(flow).transition(eq(p),eq("RECONCILIATION_PENDING"),anyString());verify(flow).command(eq(p),eq("ReconciliationRequested"),any(),eq("1.0"));verify(flow,never()).command(any(),eq("VisaPayoutInitiated"),any(),any());}
+ @Test void newPayoutHonorsExecutionOffGate(){phase("SETTLED");bank();env.setProperty("app.flow.execution-enabled","false");service.advance(id);verifyNoInteractions(flow);}
+ @Test void unknownPayoutRemainsPinnedWithoutAnotherCommand(){phase("PAYOUT_REQUESTED");bank();when(lifecycle.payout("PAY-1")).thenReturn(Optional.of(payout("UNKNOWN")));service.advance(id);verifyNoInteractions(flow);verify(jdbc).update(contains("update payment_closure set phase"),eq("PAYOUT_REQUESTED"),eq("PAYOUT_UNKNOWN_PINNED"),eq(id));}
+ @Test void failedPayoutRequiresReviewWithoutAssumingARefund(){phase("PAYOUT_REQUESTED");bank();when(lifecycle.payout("PAY-1")).thenReturn(Optional.of(payout("FAILED")));service.advance(id);verifyNoInteractions(flow);verify(jdbc).update(contains("update payment_closure set phase"),eq("REVIEW_REQUIRED"),eq("PAYOUT_FAILED_NO_REFUND_INFERRED"),eq(id));}
+ @Test void payoutSuccessStillWaitsForCompletionAccounting(){phase("PAYOUT_REQUESTED");bank();when(lifecycle.payout("PAY-1")).thenReturn(Optional.of(payout("SUCCEEDED")));service.advance(id);verify(flow).command(eq(p),eq("VisaPayoutCompleted"),any(),eq("1.0"));verify(flow,never()).transition(any(),any(),any());}
+ @Test void mismatchedOwnerReportCannotMarkReconciled(){phase("RECONCILIATION_REQUESTED");when(jdbc.queryForList(contains("from reconciliation"),eq(id),eq("PAY-1"),eq("CORR-1"))).thenReturn(List.of(Map.of("status","MISMATCH","source_hash","hash","reconciliation_id",UUID.randomUUID())));service.advance(id);verifyNoInteractions(flow);}
+ @Test void matchedReportWithChangedCurrentEvidenceCannotMarkReconciled(){phase("RECONCILIATION_REQUESTED");when(jdbc.queryForList(contains("from reconciliation"),eq(id),eq("PAY-1"),eq("CORR-1"))).thenReturn(List.of(Map.of("status","MATCHED","source_hash","old","reconciliation_id",UUID.randomUUID())));var capture=new ClosureEvidence.Capture(e,q,chain,null,UUID.randomUUID(),List.of(),List.of());when(checker.capture(e,ControlLedgerEvidence.Stage.COMPLETE)).thenReturn(capture);when(checker.fingerprint(capture)).thenReturn("changed");service.advance(id);verifyNoInteractions(flow);}
+ @Test void matchedCurrentEvidenceCompletesThePayment(){phase("RECONCILIATION_REQUESTED");UUID report=UUID.randomUUID();when(jdbc.queryForList(contains("from reconciliation"),eq(id),eq("PAY-1"),eq("CORR-1"))).thenReturn(List.of(Map.of("status","MATCHED","source_hash","current","reconciliation_id",report)));var capture=new ClosureEvidence.Capture(e,q,chain,null,UUID.randomUUID(),List.of(),List.of());when(checker.capture(e,ControlLedgerEvidence.Stage.COMPLETE)).thenReturn(capture);when(checker.fingerprint(capture)).thenReturn("current");service.advance(id);verify(flow).transition(eq(p),eq("RECONCILED"),anyString());verify(flow).command(eq(p),eq("ReconciliationCompleted"),any(),eq("1.0"));}
+ @Test void bankIntentRequestsItsSimulatedPayoutAfterSettlement(){phase("SETTLED");bank();service.advance(id);verify(flow).transition(eq(p),eq("VISA_PAYOUT_PENDING"),anyString());verify(flow).command(eq(p),eq("VisaPayoutInitiated"),any(),eq("1.0"));}
+}

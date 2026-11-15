@@ -1,0 +1,1 @@
+export const tabs=[['routing','Intent & routing'],['treasury','Treasury readiness'],['approvals','Quote & approvals'],['journey','Execution journey'],['blockchain','Blockchain evidence'],['ledger','Ledger & reconciliation'],['payout','Optional fiat payout']]

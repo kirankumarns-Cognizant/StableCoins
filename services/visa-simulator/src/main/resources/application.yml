@@ -1,0 +1,19 @@
+spring:
+  config:
+    import: "classpath:connections.properties,${CONNECTIONS_CONFIG:optional:file:./config/connections-local.properties}"
+  application:
+    name: visa-simulator
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_schema_history_visa
+
+server:
+  port: ${VISA_SIMULATOR_PORT:8086}
+

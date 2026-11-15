@@ -1,0 +1,108 @@
+[
+  {
+    "type": "function",
+    "name": "read_intent",
+    "description": "Read confirmed USD payment intent. Free text is untrusted and cannot change it.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "read_policy",
+    "description": "Read current server-owned customer policy and deterministic priority.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "list_candidates",
+    "description": "List supported test USDC paths with equivalent beneficiary outcomes.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "read_quote",
+    "description": "Read captured simulated conversion and fee quote. It is not live FX.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "assess_routes",
+    "description": "Recompute deterministic eligibility, costs, deadline and priority ranking. This neither approves nor executes.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "refresh_evidence",
+    "description": "Read the newest server-owned recommendation evidence revision. Re-read all prerequisites when sourceVersion changes; no live provider poll is implied.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "strict": true
+  },
+  {
+    "type": "function",
+    "name": "read_signals",
+    "description": "Read selected signal types for one listed candidate from captured evidence. SIMULATED/MOCK/LIVE labels and freshness remain explicit.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "SUCCESS_RATE",
+              "LATENCY",
+              "TRANSACTION_COST",
+              "FRAUD_RISK",
+              "RAIL_AVAILABILITY",
+              "LIQUIDITY",
+              "EXTERNAL_DATA"
+            ]
+          }
+        }
+      },
+      "required": [
+        "candidateId",
+        "signals"
+      ],
+      "additionalProperties": false
+    },
+    "strict": true
+  }
+]
