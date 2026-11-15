@@ -69,3 +69,7 @@ connections-local.properties
 
 # Local demonstration evidence may contain customer/account metadata.
 artifacts/
+
+# Commit reproducible dependency locks for Codespaces bootstrap.
+!/frontend/package-lock.json
+!/infrastructure/package-lock.json

@@ -37,5 +37,20 @@
   ],
   "architectureChanges": false,
   "codeCompleteSteps": 9,
-  "totalSteps": 11
+  "totalSteps": 11,
+  "codespacesOwnerReportedPrerequisites": {
+    "node": true,
+    "java21": true,
+    "docker": true,
+    "compose": true,
+    "dependencies": false
+  },
+  "publicationLockfileFix": {
+    "bothVersion3LocksIncluded": true,
+    "manifestDependencyAndEngineMatch": true,
+    "packageRegistries": [
+      "registry.npmjs.org"
+    ],
+    "codespacesInstallRerun": "PENDING"
+  }
 }

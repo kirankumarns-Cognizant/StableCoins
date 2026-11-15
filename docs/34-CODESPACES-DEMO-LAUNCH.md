@@ -42,6 +42,25 @@ CLI. Keep forwarded ports **Private**. Docker Compose binds published ports to
 loopback; do not make PostgreSQL, LocalStack or Visa public. GitHub documents the
 [repository Codespaces creation procedure](https://docs.github.com/en/codespaces/developing-in-a-codespace/creating-a-codespace-for-a-repository).
 
+### Recover a missing-lockfile bootstrap failure
+
+If `npm ci` reports `EUSAGE` and a missing `package-lock.json`, update the
+checkout before retrying. The initial published snapshot omitted both npm
+lockfiles. Both locks are now committed and match their package manifests.
+From the repository root run each command only after the previous succeeds:
+
+```bash
+git pull --ff-only origin main
+npm --prefix frontend ci
+npm --prefix infrastructure ci
+node scripts/local-workbench.cjs doctor
+```
+
+Then run `node scripts/local-workbench.cjs verify --require-database`.
+Do not substitute `npm install` or delete a lockfile to conceal this failure.
+If Git reports local changes or an install fails, preserve the changes and
+inspect that error before continuing. These commands do not deploy to AWS.
+
 ## 2 Authenticate to the selected AWS account
 
 Do this in the Codespaces terminal when identity/model resources need AWS access:
