@@ -47,7 +47,15 @@ test('validate all service origins before contacting any of them',async()=>{
 });
 test('strict database gate requires every module and permits only the named optional live model skip',()=>{
   const suites=['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'].map(module=>({module,name:'ExecutedTest',skipped:0}));
+  assert.equal(databaseGate(suites),false); // Unit suites alone cannot satisfy database acceptance.
+  for(const name of require('./local-workbench.cjs').requiredDatabaseSuites) {
+    const module=name.includes('.blockchain.')?'blockchain-service':name.includes('.ledger.')?'settlement-ledger-service':name.includes('.reconciliation.')?'reconciliation-service':name.includes('.visa.')?'visa-simulator':'payment-service';
+    suites.push({module,name,tests:1,passed:1,failures:0,errors:0,skipped:0});
+  }
   assert.equal(databaseGate(suites),true);
+  assert.equal(databaseGate(suites.slice(0,-1)),false);
+  assert.equal(databaseGate(suites.map(suite=>suite.name.endsWith('TreasuryReservationPersistenceIT')?{...suite,tests:0,passed:0}:suite)),false);
+  assert.equal(databaseGate(suites.map(suite=>suite.name.endsWith('PaymentApiIT')?{...suite,passed:0,errors:1}:suite)),false);
   assert.equal(databaseGate(suites.slice(1)),false);
   const live={module:'payment-service',name:'com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest',skipped:1};
   assert.equal(databaseGate([...suites,live]),true);

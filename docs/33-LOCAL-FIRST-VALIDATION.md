@@ -199,3 +199,50 @@ payment closure, actual model and public-testnet acceptance remain unexecuted.
 No AWS deployment occurred. Step 10 is in progress; nine of eleven delivery steps
 remain code-complete. The earlier browser checks remain synthetic step-9 evidence
 and were not rerun for this local tooling increment.
+
+## Codespaces verification findings (2026-11-15)
+
+The first strict run compiled and passed its build stages but skipped PostgreSQL
+integration tests: Testcontainers 1.20.4 selected Docker API 1.32, below the
+Codespaces daemon's reported minimum of 1.40. A one-run API 1.44 override allowed
+database tests to execute and exposed actual failures: six response-decoding
+errors in PaymentApiIT and one outbox-count assertion in PaymentFlowPersistenceIT.
+That run stopped in payment-service; later modules were not verified by that run.
+
+The shared Maven parent now supplies api.version to Surefire and Failsafe test
+JVMs through test.docker.api-version, default 1.44. Direct Maven invocations can
+override it with -Dtest.docker.api-version=VALUE for a compatible daemon. This is
+test-client configuration, not an application integration or a Docker daemon
+change. The Node verification command remains:
+
+```bash
+node scripts/local-workbench.cjs verify --require-database
+```
+
+Immutable creation, status and journey response constructors now declare their
+JSON properties explicitly, including nested status steps. Existing field names,
+getters and HTTP contracts are preserved. A client-side regression test uses
+Jackson without constructor-name inference to exercise decoding and timestamps.
+
+PaymentFlowPersistenceIT explicitly clears only its isolated Testcontainers
+outbox during fixture setup and counts events for the current payment. An outbox
+has no customer foreign key, so truncating customer fixtures previously retained
+events from earlier tests. The concurrency case still requires a single funding
+event and a single USD debit. Runtime outbox, ledger and locking code are unchanged.
+
+The existing TreasuryReservationPersistenceIT is now included in ordinary
+blockchain-service verify. Its PostgreSQL checks require no chain RPC. The explicit
+testnet profile retains its original live-suite selection and activation guards.
+Strict database acceptance now requires fresh, nonempty, fully passed results
+from all nine named database suites, including treasury reservations; unit test
+reports alone cannot satisfy this gate. The optional live-model skip remains
+permitted. A successful local unit run does not establish Codespaces acceptance.
+
+After pulling a fix, run one command at a time and inspect the newest report path.
+Retain failed reports; a later report must not be confused with an earlier run.
+Full PostgreSQL acceptance remains pending until the updated Codespace run passes.
+
+Local verification of these fixes: 32 targeted Java regression cases passed;
+40 workbench/configuration tests passed. The full Java reactor built successfully,
+with 558 passed and 52 skipped cases, zero failures/errors. Database
+skips on the Windows host remain unverified; the corrected Codespace run is pending.

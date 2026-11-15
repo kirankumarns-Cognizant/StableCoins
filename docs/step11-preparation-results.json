@@ -62,5 +62,55 @@
     "generatedCdkOutputsExcluded": 8,
     "ignoreBoundaryChecksPassed": 8,
     "publicationCheckoutNodeTestsPassed": 40
+  },
+  "ownerReportedCodespacesRun": {
+    "reportId": "1794765850888-26964-verify",
+    "status": "FAILED",
+    "dockerApiOverride": "1.44",
+    "buildStagesPassed": [
+      "node",
+      "frontend-build",
+      "frontend-lint",
+      "cdk-build",
+      "cdk-tests"
+    ],
+    "java": {
+      "tests": 381,
+      "passed": 373,
+      "failures": 1,
+      "errors": 6,
+      "skipped": 1
+    },
+    "stoppedAt": "payment-service",
+    "fullDatabaseAcceptance": false
+  },
+  "codespacesFixVerification": {
+    "status": "LOCAL_CHECKS_PASSED_CODESPACES_RERUN_PENDING",
+    "nodeTestsPassed": 40,
+    "javaRegressionTests": {
+      "passed": 32,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "codespacesRerun": "PENDING",
+    "javaReactor": {
+      "buildStatus": "SUCCESS",
+      "totals": {
+        "tests": 610,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 52,
+        "passed": 558
+      },
+      "databaseAcceptance": false
+    },
+    "testJvmDockerApiConfirmed": "1.44",
+    "documentationFilesChecked": 50,
+    "documentationErrors": 0,
+    "effectivePomInspection": {
+      "status": "BLOCKED",
+      "reason": "Optional Maven help plugin not cached for offline inspection"
+    }
   }
 }

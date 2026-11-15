@@ -60,8 +60,20 @@ function freshJavaResults(since) {
   for(const suite of suites) for(const key of Object.keys(totals)) totals[key]+=suite[key];
   return {totals,suites};
 }
+const requiredDatabaseSuites = [
+  'com.cognizant.stablecoins.payment.agent.AgentRunPersistenceIT',
+  'com.cognizant.stablecoins.payment.api.PaymentApiIT',
+  'com.cognizant.stablecoins.payment.approval.RecommendationPersistenceIT',
+  'com.cognizant.stablecoins.payment.flow.PaymentFlowPersistenceIT',
+  'com.cognizant.stablecoins.payment.integration.PaymentIntentPersistenceIT',
+  'com.cognizant.stablecoins.blockchain.integration.TreasuryReservationPersistenceIT',
+  'com.cognizant.stablecoins.ledger.integration.LedgerServiceIT',
+  'com.cognizant.stablecoins.reconciliation.flow.ReconciliationPersistenceIT',
+  'com.cognizant.stablecoins.visa.liquidity.ProviderLiquidityPersistenceIT',
+];
 function databaseGate(suites) {
   return modules.every(module=>suites.some(suite=>suite.module===module)) &&
+    requiredDatabaseSuites.every(name=>suites.some(suite=>suite.name===name && suite.tests>0 && suite.passed===suite.tests && !suite.failures && !suite.errors && !suite.skipped)) &&
     suites.every(suite=>!suite.skipped || suite.name==='com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest');
 }
 function localUrl(value) {
@@ -163,5 +175,5 @@ async function main(args=process.argv.slice(2)) {
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
   return report;
 }
-module.exports={command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,main};
+module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,main};
 if(require.main===module)main().catch(()=>{console.error('Local validation could not start');process.exitCode=2;});

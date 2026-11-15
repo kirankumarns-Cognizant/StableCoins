@@ -1,5 +1,8 @@
 package com.cognizant.stablecoins.payment.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -10,8 +13,11 @@ public class PaymentJourneyResponse {
     private final String currentStatus;
     private final List<StatusStep> steps;
 
-    public PaymentJourneyResponse(String paymentId, String correlationId,
-                                   String currentStatus, List<StatusStep> steps) {
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+    public PaymentJourneyResponse(@JsonProperty("paymentId") String paymentId,
+            @JsonProperty("correlationId") String correlationId,
+            @JsonProperty("currentStatus") String currentStatus,
+            @JsonProperty("steps") List<StatusStep> steps) {
         this.paymentId = paymentId;
         this.correlationId = correlationId;
         this.currentStatus = currentStatus;
@@ -30,8 +36,12 @@ public class PaymentJourneyResponse {
         private final String actorService;
         private final OffsetDateTime timestamp;
 
-        public StatusStep(String fromStatus, String toStatus, String reason,
-                          String actorService, OffsetDateTime timestamp) {
+        @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+        public StatusStep(@JsonProperty("fromStatus") String fromStatus,
+                @JsonProperty("toStatus") String toStatus,
+                @JsonProperty("reason") String reason,
+                @JsonProperty("actorService") String actorService,
+                @JsonProperty("timestamp") OffsetDateTime timestamp) {
             this.fromStatus = fromStatus;
             this.toStatus = toStatus;
             this.reason = reason;

@@ -1,5 +1,8 @@
 package com.cognizant.stablecoins.payment.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.OffsetDateTime;
 
 public class PaymentStatusResponse {
@@ -9,8 +12,11 @@ public class PaymentStatusResponse {
     private final String status;
     private final OffsetDateTime updatedAt;
 
-    public PaymentStatusResponse(String paymentId, String correlationId,
-                                  String status, OffsetDateTime updatedAt) {
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+    public PaymentStatusResponse(@JsonProperty("paymentId") String paymentId,
+            @JsonProperty("correlationId") String correlationId,
+            @JsonProperty("status") String status,
+            @JsonProperty("updatedAt") OffsetDateTime updatedAt) {
         this.paymentId = paymentId;
         this.correlationId = correlationId;
         this.status = status;

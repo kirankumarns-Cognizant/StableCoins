@@ -483,3 +483,14 @@ Codespaces/database, identity, model, testnet, two-customer and disruption evide
 is captured and the cumulative Word document is rendered and visually checked.
 The local Windows host has no Docker or document renderer. The previously executed
 Java/Node/CDK results above are historical verification, not new live execution.
+
+## Codespaces verification progress (2026-11-15)
+
+Owner-reported prerequisites now pass after restoring the published npm manifests
+and locks. Docker API compatibility is corrected in shared Maven test settings.
+Actual database execution exposed response JSON decoding and integration-fixture
+isolation defects; fixes are locally checked and awaiting a fresh Codespaces run.
+Treasury reservation persistence is now explicitly required by normal verification.
+Delivery remains 9 of 11 steps code-complete; steps 10 and 11 are open. The live
+identity/model/testnet demonstration, final Word document and AWS application
+deployment remain pending. See [verification details](33-LOCAL-FIRST-VALIDATION.md#codespaces-verification-findings-2026-11-15).

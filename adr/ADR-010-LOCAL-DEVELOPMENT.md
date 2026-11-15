@@ -82,3 +82,14 @@ records fresh results/skips, and checks six health/access boundaries. It does no
 substitute fixture success for database/payment acceptance or bypass identity.
 See [the staged local runbook](../docs/33-LOCAL-FIRST-VALIDATION.md). Accepted decision
 and status remain unchanged.
+
+## Codespaces compatibility and coverage note (2026-11-15)
+
+The accepted test strategy is unchanged. Test JVMs now configure the Docker API
+client version through the Maven test.docker.api-version property (default 1.44).
+Ordinary blockchain verify includes the existing treasury reservation PostgreSQL
+suite, while public-chain tests remain opt-in. Strict local verification requires
+all named persistence suites to run successfully. Codespaces exposed immutable
+response JSON decoding and integration fixture isolation defects; fixes and
+execution boundaries are recorded in [the local validation guide](../docs/33-LOCAL-FIRST-VALIDATION.md#codespaces-verification-findings-2026-11-15).
+No AWS deployment or real settlement is established by these changes.

@@ -33,6 +33,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <testcontainers.version>1.20.4</testcontainers.version>
+        <!-- Test JVM client compatibility; override with -Dtest.docker.api-version. -->
+        <test.docker.api-version>1.44</test.docker.api-version>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
         <spring-cloud-aws.version>3.1.1</spring-cloud-aws.version>
     </properties>
@@ -79,6 +81,24 @@
         </resources>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <api.version>${test.docker.api-version}</api.version>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <api.version>${test.docker.api-version}</api.version>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
