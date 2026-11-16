@@ -28,6 +28,14 @@ FAILED summary. Failure includes known component reasons, pending components and
 diagnostic paths. See [startup progress and failures](33-LOCAL-FIRST-VALIDATION.md#console-startup-progress-and-component-failures).
 These messages do not replace authenticated payment/model/testnet acceptance.
 
+Owner startup report `1794830715419-85490-start` completed PASSED: nine of nine
+components started, all 18 backend health/access probes passed, and React plus its
+API proxy passed readiness. The successful summary prints the Application URL for
+the demo and six labeled backend `/health` URLs for optional diagnostics, derived
+from configured local service ports. Forward those diagnostic ports privately
+before browser access; the startup script does not open browsers or make ports
+public. The application UI remains the presenter entry point on port 5173.
+
 Codespaces verification ran 610 Java tests: 609 passed, with only the opt-in
 `RoutingAgentLiveTest` skipped. The required PostgreSQL gate passed. After
 Cognito configuration, startup report `1794821303277-17464-start` and smoke

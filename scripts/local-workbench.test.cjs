@@ -6,14 +6,18 @@ const {readConnections}=require('../services/config/read-connections.cjs');
 test('successful unified startup prints current Codespaces frontend and backend health URLs',()=>{
   const messages=startupMessages({action:'start',status:'PASSED'},{CODESPACE_NAME:'demo-space-123',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'});
   assert.ok(messages.includes('Application URL: https://demo-space-123-5173.app.github.dev/'));
-  assert.ok(messages.includes('Backend health URL: https://demo-space-123-8080.app.github.dev/health'));
+  assert.ok(messages.includes('Payment service health URL: https://demo-space-123-8080.app.github.dev/health'));
+  for(const port of [8080,8081,8082,8083,8084,8086])assert.ok(messages.some(message=>message.endsWith(`-${port}.app.github.dev/health`)));
+  assert.equal(messages.filter(message=>message.includes(' health URL: ')).length,6);
+  const custom=startupMessages({action:'start',status:'PASSED'},{CODESPACE_NAME:'demo-space-123',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'},readConnections({PAYMENT_SERVICE_URL:'http://127.0.0.1:9080'}));
+  assert.ok(custom.includes('Payment service health URL: https://demo-space-123-9080.app.github.dev/health'));
   assert.match(messages.join('\n'),/React and all six backend services are ready/);
 });
 test('startup URLs use loopback outside Codespaces and never render malformed forwarding variables',()=>{
   for(const environment of [{},{CODESPACE_NAME:'demo',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'https://user:secret@external.test'},{CODESPACE_NAME:'demo\nforged message',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}]) {
     const messages=startupMessages({action:'start',status:'PASSED'},environment).join('\n');
     assert.match(messages,/Application URL: http:\/\/localhost:5173\//);
-    assert.match(messages,/Backend health URL: http:\/\/localhost:8080\/health/);
+    assert.match(messages,/Payment service health URL: http:\/\/localhost:8080\/health/);
     assert.ok(!messages.includes('secret') && !messages.includes('forged'));
   }
 });

@@ -119,16 +119,24 @@ async function smoke(config=readConnections(), fetcher=fetch, onCheck=()=>{}) {
   }
   return checks;
 }
-function startupMessages(report, environment=process.env) {
+function startupMessages(report, environment=process.env, config) {
   if(report.action!=='start' || report.status!=='PASSED') return [];
+  config=config || readConnections(environment);
   const name=environment.CODESPACE_NAME,domain=environment.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
   const forwarded=typeof name==='string' && /^[a-z0-9-]+$/i.test(name) && typeof domain==='string' && /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(domain);
   const origin=port=>forwarded?`https://${name}-${port}.${domain}`:`http://localhost:${port}`;
+  const labels={payment:'Payment service','compliance-quote':'Compliance / quote service',blockchain:'Blockchain service',ledger:'Settlement / ledger service',reconciliation:'Reconciliation service',visa:'Visa simulator'};
+  const healthUrls=services.map(service=>{
+    const target=localUrl(config[destinations[service]]);
+    return `${labels[service]} health URL: ${forwarded?origin(target.port || 80):target.origin}/health`;
+  });
   return [
     'Startup status: STARTED',
     'Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.',
     `Application URL: ${origin(5173)}/`,
-    `Backend health URL: ${origin(8080)}/health`,
+    'Backend health URLs (diagnostics only; use the Application URL for the demo):',
+    ...healthUrls,
+    'Forward a diagnostic service port privately in Codespaces before opening its browser URL. No browser is opened automatically.',
     'Keep Codespaces ports Private. Sign-in and full payment acceptance are separate checks.',
   ];
 }

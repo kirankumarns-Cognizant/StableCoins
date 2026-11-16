@@ -116,8 +116,13 @@ before retrying in that case. It never kills another port owner or opens a brows
 The helper checks the development-server marker, application HTML and the
 proxied anonymous API denial (401) before announcing:
 `Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.`
-It prints the application URL (5173) and backend `/health` URL (8080), using current
-Codespaces environment variables or localhost outside Codespaces. Keep forwarded
+It prints the application URL (5173) and labeled `/health` URLs for all six backend
+services (default ports 8080, 8081, 8082, 8083, 8084 and 8086), using current
+Codespaces environment variables and each configured local service port. Outside
+Codespaces it prints the configured loopback service origin. The application URL
+is the demo entry point; backend health URLs are optional diagnostics, not screens.
+A service browser URL requires that port to be forwarded privately in Codespaces;
+printing it does not create a port forward or launch a browser. Keep forwarded
 ports Private. The frontend lasts until its process or the Codespace is stopped;
 re-run `start` after resuming a stopped Codespace. `smoke` remains a backend-only
 read-only check. Neither command establishes completed sign-in or payment acceptance.
@@ -309,3 +314,10 @@ this Windows host failed explicitly at its missing Java 21 selection and missing
 Docker/Compose prerequisites, named those prerequisites and all pending components,
 and printed no success URLs. Full nine-component startup still requires the
 Docker-capable Codespace; these checks do not claim a connected payment or deployment.
+
+Subsequent owner execution in Codespaces: report `1794830715419-85490-start`
+completed PASSED with nine of nine components ready, 18 passing backend probes
+and successful frontend/proxy checks. This establishes local startup readiness;
+authenticated payment, model execution and public-testnet acceptance remain
+separate gates. The URL summary now includes all six labeled backend health URLs,
+including configured port overrides; targeted startup tests cover that rendering.
