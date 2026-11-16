@@ -1,0 +1,83 @@
+{
+  "quotes": [
+    {
+      "feeUsd": 2,
+      "fxRate": null,
+      "quoteId": "1da672bf-31e3-3d72-95e8-6ac3f553a6dc",
+      "version": 1,
+      "attempts": 1000,
+      "available": true,
+      "completed": 990,
+      "createdAt": "2026-11-16T12:35:54.494681280Z",
+      "expiresAt": "2026-11-16T12:40:54.494681280Z",
+      "requestId": "0aa4f748-76f0-41a3-8f1d-f037b8e62218",
+      "sourceUsd": 1000,
+      "fraudScore": 10,
+      "providerId": "SIMULATED-PROVIDER-A",
+      "payoutAmount": null,
+      "transferUsdc": 1000,
+      "latencyMillis": 120000,
+      "payoutCurrency": null,
+      "simulationVersion": "simulation-v1",
+      "providerFiatAvailable": null
+    },
+    {
+      "feeUsd": 5,
+      "fxRate": null,
+      "quoteId": "df7bf859-68b1-3ad2-88dd-18d4b5955522",
+      "version": 1,
+      "attempts": 1000,
+      "available": true,
+      "completed": 990,
+      "createdAt": "2026-11-16T12:35:54.494681280Z",
+      "expiresAt": "2026-11-16T12:40:54.494681280Z",
+      "requestId": "0aa4f748-76f0-41a3-8f1d-f037b8e62218",
+      "sourceUsd": 1000,
+      "fraudScore": 10,
+      "providerId": "SIMULATED-PROVIDER-B",
+      "payoutAmount": null,
+      "transferUsdc": 1000,
+      "latencyMillis": 60000,
+      "payoutCurrency": null,
+      "simulationVersion": "simulation-v1",
+      "providerFiatAvailable": null
+    }
+  ],
+  "request": {
+    "outcome": "USDC_WALLET",
+    "corridor": "USD-USDC-USDC_WALLET",
+    "deadline": "2026-11-16T13:31:45.861Z",
+    "paymentId": "PAY-52272AAC4E14",
+    "requestId": "0aa4f748-76f0-41a3-8f1d-f037b8e62218",
+    "sourceUsd": 1000,
+    "customerId": "11111111-1111-1111-1111-111111111111",
+    "providerIds": [
+      "SIMULATED-PROVIDER-A",
+      "SIMULATED-PROVIDER-B"
+    ],
+    "transferUsdc": 1000,
+    "correlationId": "CORR-17EF6A110D4B",
+    "requestedRail": "AUTO",
+    "recipientWallet": "0xb83a9fee3557c7fd1d206beafd989a8ba8533a07"
+  },
+  "treasury": {
+    "chainId": 84532,
+    "network": "base-sepolia",
+    "reasons": [],
+    "gasLimit": 78000,
+    "totalEth": 0.5,
+    "expiresAt": "2026-11-16T12:36:24.724831736Z",
+    "totalUsdc": 10000,
+    "observedAt": "2026-11-16T12:35:54.724831736Z",
+    "gasPriceWei": 1200000000,
+    "reservedEth": 0,
+    "availableEth": 0.5,
+    "estimatedGas": 65000,
+    "evidenceMode": "MOCK",
+    "reservedUsdc": 0,
+    "availableUsdc": 10000,
+    "tokenContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "walletAddress": "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+    "requiredGasEth": 0.0001036
+  }
+}

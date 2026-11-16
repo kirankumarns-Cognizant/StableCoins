@@ -357,3 +357,60 @@ test USDC and test ETH before attempting the primary USD 10,000 scenario.
 
 `REAL_TESTNET` is the backend mode enum. `DEMO_EVIDENCE_MODE=TESTNET` is the
 independent runner's evidence label; they are different configuration fields.
+
+### Preparation diagnosis and recovery - 2026-11-16
+
+The supplied records for PAY-52272AAC4E14 / CORR-17EF6A110D4B were replayed locally
+at the original attempt time. Both provider documents and the MOCK treasury
+observation deserialize, assemble all fourteen observations (seven per provider),
+and survive a JSON round trip. The deterministic assessment selects Provider A:
+USD 2.00 simulated provider fee + USD 0.21 simulated ETH budgeting cost = USD 2.21,
+within the pinned USD 5 limit. Provider B's total is USD 5.21. This replay is a
+regression test, not a live quote, real wallet balance or model execution.
+
+A transaction-ordering defect was found in the recommendation handoff: JPA may
+queue the new recommendation INSERT while JDBC immediately links its ID from
+payment_flow_preparation. An explicit JPA flush now precedes the JDBC handoff,
+inside the same transaction; failure still rolls back recommendation/audit/outbox
+writes. This addresses a plausible cause of the observed retries. The supplied
+logs omit the exception, so the original Codespaces failure is not conclusively
+attributed until the database test and a fresh UI attempt execute.
+
+Worker deferrals now report exception class, root cause class and a validated
+SQLSTATE (for example, 23503 identifies a foreign-key violation). Exception text,
+SQL parameters and stack traces are withheld because they can contain secrets or
+PII. The previous 120-second timeout remains; extending it is not the fix.
+
+Verification: 44 targeted Java tests passed, zero failures/errors/skips. These
+include the captured-data replay, routing assembler, payment flow, recommendation
+controls and sanitized failure logging. Two new PostgreSQL regression cases
+compile but have not executed locally; Docker is unavailable on this laptop.
+Actual Cognito renewal, model inference and public-testnet acceptance remain open.
+
+The existing intent deadline, 2026-11-16T13:31:45.861Z, has now elapsed. Preserve
+that payment and its timed-out preparation. Do not edit its immutable intent or
+manually mark it READY. For the next UI rehearsal after updating/restarting:
+
+1. Open the application URL and sign in securely as demo-a-operator. Cognito
+   authenticates; the API resolves Customer A / PAYMENT_OPERATOR. A fresh sign-in
+   obtains memory-only refresh credentials for the new session behavior.
+2. Overview > New payment. Select the seeded USD account and Fictional Demo
+   Supplier. Use USD 1,000, USDC_WALLET, maximum fee USD 5, LOWEST_COST and AUTO.
+   Set Deliver by to a future UTC timestamp with enough time for the demonstration.
+3. Confirm the instruction and click Create payment intent. Record the NEW payment
+   and correlation IDs; retain the old IDs separately as diagnostic history.
+4. Intent & routing > Prepare / refresh recommendation. Wait for a recorded READY
+   result and inspect deterministic provider comparison, eligibility and freshness.
+   Refresh only reloads evidence; it does not start a replacement preparation.
+5. If preparation fails again, retain the new request ID and inspect payment-service
+   logs for errorType/causeType/sqlState. Stop before approvals or execution. Do not
+   rerun payment creation to work around an uncertain financial outcome.
+6. Once ready, continue the existing complete navigation map: Intent & routing >
+   Run reasoning agent (explicit live-provider setup required) > Treasury readiness >
+   Quote & approvals as approver one and then approver two > Execution journey as
+   operator > Blockchain evidence > Ledger & reconciliation > optional fiat payout.
+   Each step must use the same valid recommendation and payment IDs. Quote/approval
+   and treasury evidence expiry remain enforced independently of login continuity.
+
+The captured observation is MOCK and uses the default mock treasury address. It
+does not establish balances or funding of the separately generated real wallets.

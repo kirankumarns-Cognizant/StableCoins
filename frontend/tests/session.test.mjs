@@ -53,4 +53,3 @@ test('transient failure retries only while access is valid, then ends session',a
 test('disabled renewal and pasted access tokens retain provider expiry; no fake unlimited token',async()=>{
  for(const [enabled,refreshToken] of [[false,'refresh'],[true,undefined]]){let calls=0;const h=harness(async()=>{calls++;throw Error('must not refresh')},enabled);h.keeper.start({token:'manual',expiresAt:11000,refreshToken});h.setTime(11000);await h.fire();assert.equal(calls,0);assert.equal(h.expired,1);await assert.rejects(h.keeper.validToken())}
 })
-

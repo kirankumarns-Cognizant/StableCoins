@@ -43,7 +43,7 @@ class RecommendationPersistenceIT {
     Payment payment;AssessmentContext context;RoutingEvidence.Snapshot evidence;RecommendationDocument.Quote quote;AuthorizedCustomer first,second;
     @BeforeEach void setup() {
         new TransactionTemplate(transactions).executeWithoutResult(status->{
-            for(String table:List.of("routing_decision","routing_audit","routing_recommendation","payment_outbox_event","payment_status_history","payment","beneficiary","account","customer")) jdbc.execute("DELETE FROM "+table);
+            for(String table:List.of("payment_flow_preparation","routing_decision","routing_audit","routing_recommendation","payment_outbox_event","payment_status_history","payment","beneficiary","account","customer")) jdbc.execute("DELETE FROM "+table);
             Customer c=new Customer();c.setName("Fictional approval customer");c.setCustomerType("CORPORATE");em.persist(c);em.flush();
             var a=com.cognizant.stablecoins.payment.support.IntentFixtures.account();a.setCustomerId(c.getCustomerId());a.setAccountType("OPERATING");a.setBalance(new java.math.BigDecimal("100000"));em.persist(a);
             var b=com.cognizant.stablecoins.payment.support.IntentFixtures.beneficiary();b.setCustomerId(c.getCustomerId());b.setName("Fictional supplier");b.setCountry("IND");em.persist(b);em.flush();
@@ -64,6 +64,28 @@ class RecommendationPersistenceIT {
             Future<?> two=pool.submit(()->{try{start.await();b.run();}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}});
             start.countDown();one.get(20,TimeUnit.SECONDS);two.get(20,TimeUnit.SECONDS);
         }
+    }
+    @Test void capturedProposalCanBeLinkedThroughJdbcBeforeOuterTransactionCommits(){
+        UUID id=UUID.randomUUID();
+        new TransactionTemplate(transactions).executeWithoutResult(status->{
+            jdbc.update("insert into payment_flow_preparation(request_id,payment_id,correlation_id,actor_id,request_document,status) values (?,?,?,'first','{}'::jsonb,'PENDING')",id,payment.getPaymentId(),payment.getCorrelationId());
+            var r=service.proposeCaptured(id,first,context,evidence,List.of(quote));
+            // JdbcTemplate does not trigger Hibernate AUTO flush. PostgreSQL checks this FK immediately.
+            jdbc.update("update payment_flow_preparation set status='READY',recommendation_id=? where request_id=?",r.recommendationId(),id);
+            assertThat(jdbc.queryForObject("select count(*) from payment_flow_preparation p join routing_recommendation r on r.recommendation_id=p.recommendation_id where p.request_id=? and p.status='READY'",Integer.class,id)).isEqualTo(1);
+        });
+    }
+    @Test void failedPreparationLinkRollsBackFlushedRecommendationAndAudit(){
+        UUID id=UUID.randomUUID();
+        assertThatThrownBy(()->new TransactionTemplate(transactions).executeWithoutResult(status->{
+            service.proposeCaptured(id,first,context,evidence,List.of(quote));
+            assertThat(jdbc.queryForObject("select count(*) from routing_recommendation where recommendation_id=?",Integer.class,id)).isEqualTo(1);
+            // An invalid payment causes an immediate FK failure after the JPA flush.
+            jdbc.update("insert into payment_flow_preparation(request_id,payment_id,correlation_id,actor_id,request_document,status,recommendation_id) values (?,'PAY-MISSING','CORR-MISSING','first','{}'::jsonb,'READY',?)",UUID.randomUUID(),id);
+        })).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("select count(*) from routing_recommendation where recommendation_id=?",Integer.class,id)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from routing_audit where recommendation_id=?",Integer.class,id)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from payment_outbox_event",Integer.class)).isZero();
     }
     @Test void migrationAndJsonbEvidenceRoundTrip(){var r=propose();var loaded=service.get(payment.getPaymentId(),r.recommendationId(),first);assertThat(loaded.document()).isEqualTo(r.document());assertThat(loaded.requiredApprovals()).isEqualTo(2);}
     @Test void concurrentDuplicateApprovalsCreateOneVote() throws Exception {var r=propose();accept(r,first);concurrently(()->approve(r,first),()->approve(r,first));

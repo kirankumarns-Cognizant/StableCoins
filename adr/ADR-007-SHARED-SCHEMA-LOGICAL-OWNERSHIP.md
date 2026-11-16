@@ -88,3 +88,13 @@ No migration checksum repair or financial data reset is performed. This matches
 the existing cross-owner integration-test setup and preserves separate owner
 history tables. Live PostgreSQL startup remains an acceptance gate.
 See [local validation](../docs/33-LOCAL-FIRST-VALIDATION.md); accepted decision unchanged.
+
+## Preparation handoff implementation note - 2026-11-16
+
+The payment-owned recommendation is explicitly flushed through its existing JPA
+repository before a JDBC update links it from the payment-owned preparation row.
+Both writes retain the same transaction and rollback boundary. No cross-owner
+write, schema constraint relaxation or additional service is introduced. Added
+PostgreSQL cases cover immediate FK visibility and rollback after flush; local
+compilation is verified, live database execution remains pending. See the dated
+[UI recovery notes](../docs/29-PROTOTYPE-EXECUTION-RUNBOOK.md).

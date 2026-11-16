@@ -63,4 +63,3 @@ export class SessionKeeper {
   return this.pending
  }
 }
-

@@ -89,7 +89,11 @@ public class RecommendationService {
         var payment=lock(context.paymentId(),actor);bind(payment,context);requirePolicy(payment);
         var assessment=assessor.assess(actor,context,payment.getIntent(),evidence);
         var quote=quotes.stream().filter(q->Objects.equals(q.candidateId(),assessment.preferredCandidateId())).findFirst().orElse(null);
-        return propose(id,actor,context,evidence,quote);
+        // The coordinator links this ID using JDBC in the same transaction. Flush JPA first
+        // so the immediate PostgreSQL foreign key can see the recommendation; do not commit.
+        var proposed=propose(id,actor,context,evidence,quote);
+        recommendations.flush();
+        return proposed;
     }
     public RecommendationView get(String paymentId,UUID id,AuthorizedCustomer actor) {
         return view(load(paymentId,id,actor));
