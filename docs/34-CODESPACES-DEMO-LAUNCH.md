@@ -22,6 +22,12 @@ resources must be configured and tested. No completed live run is asserted here.
 
 ### Owner-reported progress (2026-11-16)
 
+The startup console now reports STARTING, numbered component readiness out of nine,
+15-second elapsed-time heartbeats, per-check HTTP outcomes and a final STARTED or
+FAILED summary. Failure includes known component reasons, pending components and
+diagnostic paths. See [startup progress and failures](33-LOCAL-FIRST-VALIDATION.md#console-startup-progress-and-component-failures).
+These messages do not replace authenticated payment/model/testnet acceptance.
+
 Codespaces verification ran 610 Java tests: 609 passed, with only the opt-in
 `RoutingAgentLiveTest` skipped. The required PostgreSQL gate passed. After
 Cognito configuration, startup report `1794821303277-17464-start` and smoke

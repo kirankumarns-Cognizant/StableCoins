@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Local development only. Reuses existing builds, Compose, security and financial runners.
 const {spawn} = require('node:child_process');
-const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, openSync, closeSync} = require('node:fs');
+const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, writeSync, existsSync, openSync, closeSync} = require('node:fs');
 const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
+const {containerChecks,startupStage,failureMessages,startupTracker} = require('./startup-status.cjs');
 const root = resolve(__dirname, '..');
 const modules = ['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'];
 const services = ['payment','compliance-quote','blockchain','ledger','reconciliation','visa'];
@@ -25,9 +26,14 @@ function run(executable, args, options = {}) {
   return new Promise(resolveRun => {
     let output = '';
     const child = spawn(spec.executable,spec.args,{cwd:root,env:options.env || process.env,windowsHide:true,windowsVerbatimArguments:spec.windowsVerbatimArguments,
-      stdio:options.log ? ['ignore',options.log,options.log] : ['ignore','pipe','pipe']});
-    child.stdout?.on('data',chunk => {if(output.length < 32000) output += chunk;});
-    child.stderr?.on('data',chunk => {if(output.length < 32000) output += chunk;});
+      stdio:options.log && !options.onOutput ? ['ignore',options.log,options.log] : ['ignore','pipe','pipe']});
+    const receive=chunk=>{
+      if(options.log && options.onOutput)writeSync(options.log,chunk);
+      if(output.length<32000)output+=chunk;
+      options.onOutput?.(chunk);
+    };
+    child.stdout?.on('data',receive);
+    child.stderr?.on('data',receive);
     let timedOut = false;
     const timer = setTimeout(() => {timedOut = true; child.kill();}, options.timeoutMs || 30000);
     child.on('error',() => {clearTimeout(timer); resolveRun({code:127,output:'',timedOut:false});});
@@ -97,17 +103,19 @@ async function doctor(execute=run) {
   return {node:major>22 || major===22 && minor>=18,java21:java.code===0 && /version "21[.\"]/.test(java.output),docker:docker.code===0,compose:compose.code===0,
     dependencies:existsSync(join(root,'frontend/node_modules')) && existsSync(join(root,'infrastructure/node_modules'))};
 }
-async function smoke(config=readConnections(), fetcher=fetch) {
+async function smoke(config=readConnections(), fetcher=fetch, onCheck=()=>{}) {
   const timeout=Number(config['local.validation.health-timeout-ms']);
   if(!Number.isSafeInteger(timeout) || timeout<100 || timeout>30000) throw Error('Invalid local health timeout');
   // Validate every destination before making any network request.
   const origins=Object.fromEntries(services.map(name=>[name,localUrl(config[destinations[name]])]));
   const checks=[];
   for(const name of services) {
+    const first=checks.length;
     checks.push({name:`${name}:health`,...await probe(new URL('/health',origins[name]),[200],fetcher,timeout)});
     const path=name==='payment'?'/api/v1/payments/workbench':'/api/v1/local-access-probe';
     checks.push({name:`${name}:anonymous-denied`,...await probe(new URL(path,origins[name]),[401],fetcher,timeout)});
     checks.push({name:`${name}:forged-token-denied`,...await probe(new URL(path,origins[name]),[401],fetcher,timeout,{Authorization:'Bearer deliberately-invalid-local-probe'})});
+    for(const check of checks.slice(first))onCheck(check);
   }
   return checks;
 }
@@ -117,6 +125,7 @@ function startupMessages(report, environment=process.env) {
   const forwarded=typeof name==='string' && /^[a-z0-9-]+$/i.test(name) && typeof domain==='string' && /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(domain);
   const origin=port=>forwarded?`https://${name}-${port}.${domain}`:`http://localhost:${port}`;
   return [
+    'Startup status: STARTED',
     'Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.',
     `Application URL: ${origin(5173)}/`,
     `Backend health URL: ${origin(8080)}/health`,
@@ -130,11 +139,17 @@ async function main(args=process.argv.slice(2)) {
   mkdirSync(directory,{recursive:true});
   const file=join(directory,'report.json');
   const report={action,startedAt:new Date().toISOString(),status:'RUNNING',scope:'LOCAL_ONLY',liveAcceptance:false,checks:[]};
+  const tracker=action==='start'?startupTracker():null;
+  const componentFor=name=>({payment:'payment-service','compliance-quote':'compliance-quote-service',blockchain:'blockchain-service',ledger:'settlement-ledger-service',reconciliation:'reconciliation-service',visa:'visa-simulator'})[name];
   const save=()=>writeFileSync(file,JSON.stringify(report,null,2)+'\n','utf8');save();
   console.log(`Local ${action}; report: ${file}`);
+  if(action==='start')console.log('Startup status: STARTING. Checking prerequisites, backend containers, API access and frontend readiness.');
   try {
     if(action==='doctor' || action==='verify' || action==='start') {
-      report.prerequisites=await doctor();
+      report.prerequisites=action==='start'?await startupStage('prerequisites',async()=>{
+        const prerequisites=await doctor();
+        return {status:Object.values(prerequisites).every(Boolean)?'PASSED':'FAILED',prerequisites};
+      }).then(result=>result.prerequisites):await doctor();
       console.log('Prerequisites:',JSON.stringify(report.prerequisites));
     }
     if(action==='doctor') report.status=Object.values(report.prerequisites).every(Boolean)?'READY':'BLOCKED';
@@ -175,20 +190,41 @@ async function main(args=process.argv.slice(2)) {
       if(!Number.isSafeInteger(waitSeconds) || waitSeconds<60 || waitSeconds>1200)throw Error('Invalid local Compose startup timeout');
       // Compose defaults keep MOCK/testnet-off. Existing owner migrations and queue initialization are authoritative.
       const logPath=join(directory,'compose.log'),log=openSync(logPath,'w');
-      let result;try{result=await run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,timeoutMs:1800000});}finally{closeSync(log);}
-      report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,log:logPath});save();
+      console.log(`Backend build/start log: ${logPath}`);
+      console.log(tracker.summary());
+      let result;try{result=await startupStage('backend containers: build, start and health checks',()=>run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,onOutput:tracker.output,timeoutMs:1800000}));}finally{closeSync(log);}
+      report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,reason:result.timedOut?'COMMAND_TIMEOUT':result.code===0?undefined:'BUILD_OR_CONTAINER_READINESS_FAILED',log:logPath});save();
+      const inventory=await run('docker',['compose','--profile','services','ps','--all','--format','json'],{timeoutMs:10000});
+      try {
+        if(inventory.code!==0)throw Error('Container status unavailable');
+        report.containers=containerChecks(inventory.output);
+        for(const check of report.containers)tracker.update(check.name,check.status==='PASSED'?'STARTED':'FAILED',check.reason+(check.exitCode!==undefined?' (exit '+check.exitCode+')':''));
+      }catch {report.containerDiagnostics='UNAVAILABLE';}
+      save();
       if(result.code!==0)throw Error('Compose startup failed; inspect the local log. Existing volumes were retained');
+      if(report.containers?.some(check=>check.status==='FAILED'))throw Error('A container is no longer ready after Compose startup; inspect compose.log and the component status');
+      if(!report.containers)for(const component of tracker.snapshot().filter(component=>component.name!=='react-frontend'))tracker.update(component.name,'STARTED','Compose readiness passed; detailed status snapshot unavailable');
     }
     if(action==='smoke' || action==='start') {
-      report.checks.push(...await smoke());
+      const checks=action==='start'?await startupStage('backend API health and access checks',async()=>{
+        const checks=await smoke(readConnections(),fetch,check=>{
+          console.log(`[${check.status==='PASSED'?'READY':'FAILED'}] ${check.name}${check.httpStatus!==undefined?' | HTTP '+check.httpStatus:' | '+check.reason}`);
+          if(check.status==='FAILED')tracker.update(componentFor(check.name.split(':')[0]),'FAILED',check.name+' '+(check.reason || 'HTTP '+check.httpStatus));
+        });
+        return {status:checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED',checks};
+      }).then(result=>result.checks):await smoke();
+      report.checks.push(...checks);
       report.status=report.checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED';
       report.scope='LOCAL_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
       if(action==='start' && report.status==='PASSED') {
         const config=readConnections();
         const frontendLog=join(directory,'frontend.log');
+        console.log(`Frontend diagnostic log: ${frontendLog}`);
         try {
-          report.checks.push(await startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])}));
+          report.checks.push(await startupStage('React frontend and API proxy',()=>startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])})));
+          tracker.update('react-frontend','STARTED','Application HTML and API proxy checks passed');
         } catch(error) {
+          tracker.update('react-frontend','FAILED','Frontend or API proxy not ready; inspect frontend.log');
           report.checks.push({name:'frontend-start',status:'FAILED',log:frontendLog});
           throw error;
         }
@@ -196,9 +232,11 @@ async function main(args=process.argv.slice(2)) {
       }
     }
   } catch(error) {report.status='FAILED';report.reason=error.message;}
+  if(tracker){report.components=tracker.snapshot();console.log(tracker.summary());}
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
+  for(const message of failureMessages(report))console.error(message);
   for(const message of startupMessages(report))console.log(message);
   return report;
 }

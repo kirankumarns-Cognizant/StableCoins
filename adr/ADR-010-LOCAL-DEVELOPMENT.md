@@ -103,3 +103,9 @@ Local Java cold-start grace and bounded startup waits are configurable. This
 implements the accepted local development strategy; AWS hosting and financial
 execution boundaries are unchanged. See the local validation guide and the
 [numbered presenter navigation](../docs/29-PROTOTYPE-EXECUTION-RUNBOOK.md#numbered-presenter-navigation-url-login-roles-actions-and-outcomes).
+
+Startup console reporting also streams allowlisted Compose health events, counts
+nine local components, emits elapsed-time heartbeats and records safe structured
+failure reasons plus log locations. It reuses existing Compose health and API
+access checks; no new service, authentication bypass or architecture change is
+introduced. Unknown build/application causes remain explicitly diagnostic work.

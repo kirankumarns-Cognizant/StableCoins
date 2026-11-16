@@ -123,6 +123,34 @@ re-run `start` after resuming a stopped Codespace. `smoke` remains a backend-onl
 read-only check. Neither command establishes completed sign-in or payment acceptance.
 A failed or blocked startup never prints success messages or application URLs.
 
+### Console startup progress and component failures
+
+The unified command prints `Startup status: STARTING` immediately, stage progress
+and an elapsed-time heartbeat every 15 seconds during long operations. Container
+health events are read from Compose output while it runs; only known component
+names and readiness states are printed, not arbitrary application/build log text.
+Each new result has the form `[3/9] payment-service | STARTED | Container health check passed`.
+The nine counted components are PostgreSQL, LocalStack, the six Java services and
+React. The number counts components with an observed started/failed result;
+remaining components are pending, not assumed healthy. Readiness can regress:
+a subsequent failed health/access check changes that component to FAILED.
+
+After Compose finishes, a structured status snapshot identifies exited, unhealthy,
+restarting and missing containers; exit codes are retained when available. A
+failed build or unavailable Docker status cannot always identify the application
+root cause: the console links `compose.log` rather than inventing a reason.
+The 18 backend API checks print their HTTP results, followed by frontend/proxy
+readiness. A final summary states how many of nine components started, failed or
+remain pending. `Startup status: STARTED` and the application URL appear only on
+complete success. Failure prints `Startup status: FAILED`, failed component/check
+names, diagnostic reasons, pending components, log paths and the JSON report path.
+Raw logs remain local for diagnosis; do not share credentials from them.
+
+If PostgreSQL or LocalStack is stopped, the backend cannot establish full
+readiness. Exit code 255 alone does not prove an out-of-memory event or its cause.
+Recover those dependencies without deleting volumes, then recheck the backend.
+Use a second terminal while a startup command is still active.
+
 Concurrent Java cold starts can take several minutes. Application container health
 grace defaults to `LOCAL_SERVICE_HEALTH_START_PERIOD=240s`; Compose readiness has
 `LOCAL_START_WAIT_SECONDS=600`, and frontend readiness has
@@ -165,7 +193,8 @@ scripts after migrations; they do not replenish existing account balances. Follo
 [the settlement guide](31-SETTLEMENT-PAYOUT-RECONCILIATION.md) for simulated USD/INR
 provider prefunding and payout recovery.
 
-Open another root terminal and run:
+The unified `start` command above already starts React. Use its printed application
+URL; a separate frontend command is only needed for manual frontend development:
 
 ```bash
 npm --prefix frontend run dev -- --host 127.0.0.1
@@ -271,3 +300,12 @@ Local verification of these fixes: 32 targeted Java regression cases passed;
 40 workbench/configuration tests passed. The full Java reactor built successfully,
 with 558 passed and 52 skipped cases, zero failures/errors. Database
 skips on the Windows host remain unverified; the corrected Codespace run is pending.
+
+Verification of startup reporting (2026-11-16): all 36 targeted Node checks passed,
+including split Compose events, duplicate suppression, safe component names,
+exit-code 255 diagnosis, heartbeats and no success announcement after failure.
+Node syntax and the runbook link/fence checks passed. A real local invocation on
+this Windows host failed explicitly at its missing Java 21 selection and missing
+Docker/Compose prerequisites, named those prerequisites and all pending components,
+and printed no success URLs. Full nine-component startup still requires the
+Docker-capable Codespace; these checks do not claim a connected payment or deployment.
