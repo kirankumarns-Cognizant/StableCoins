@@ -321,3 +321,62 @@ and successful frontend/proxy checks. This establishes local startup readiness;
 authenticated payment, model execution and public-testnet acceptance remain
 separate gates. The URL summary now includes all six labeled backend health URLs,
 including configured port overrides; targeted startup tests cover that rendering.
+
+## Completion percentages and verification configuration isolation (2026-11-16)
+
+Both commands retain the same invocation:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start
+node --env-file=.env scripts/local-workbench.cjs verify --require-database
+```
+
+Run one command at a time. Percentages count finished checks, not elapsed time,
+individual Java tests, payment progress or live acceptance. Startup counts nine
+components. Eight healthy backend/dependency containers show 88%; frontend HTML
+and API proxy readiness complete the ninth check. Verification counts eight
+stages: prerequisites, Node tests, frontend build, frontend lint, CDK build, CDK
+tests, Java reactor and final Java evidence/database-gate validation. The Node
+stage includes all frontend `*.test.mjs` unit tests, including session renewal.
+Long-running stages print their current percentage and elapsed time every 15
+seconds, and verification prints each stage's diagnostic log path before running it.
+
+Example console messages:
+
+```text
+[3/9 | 33%] payment-service | STARTED | Container health check passed
+[STARTING] java: still working (30s elapsed) | 75% complete
+[7/8 | 87%] java | PASSED
+[8/8 | 100%] java-evidence | PASSED
+Verification progress: 100% | 8/8 stages finished, 0 failed
+```
+
+A failed check counts as finished and is shown separately. Thus 100% can accompany
+FAILED when the final check fails; only the explicit final status establishes the
+result. Early failures leave later checks pending. Each JSON report now includes
+`progress` with its basis, completed count, total, percent and failure count.
+Startup still prints application URLs only after every readiness/access check passes.
+
+Owner report `1794847618091-8861-verify` passed Node/frontend/CDK stages but failed
+Java: 359 passed, four failed and one optional live-model case skipped. All four
+failures were in `ConnectionConfigurationTest`. The assertions read the deployed
+Cognito issuer and Base Sepolia chain ID instead of test settings because the
+verification subprocess inherited application environment overrides. This is
+separate from the earlier recommendation persistence fix.
+
+Verification now removes connection environment variables declared by the shared
+configuration, external connection-file selectors and Spring overrides from its
+child processes. Java/Docker tooling variables remain available. Real inference
+stays disabled. This does not edit `.env`, private properties, running containers,
+application connection precedence or test-injected configuration. Continue to use
+the normal `.env` when starting the application. The next Codespaces strict run
+must still establish full database acceptance; these changes do not claim it.
+
+Local verification of this update: all 81 Node unit checks passed with no skips;
+all six `ConnectionConfigurationTest` cases passed using Java 21 with the verifier's
+actual isolated environment and deliberately supplied dummy deployment overrides.
+The targeted Maven reactor compiled successfully. CLI checks with an intentionally
+missing JDK confirmed both commands report prerequisite failure, retain pending
+checks and print no application success URL. These are local regression results;
+the full Codespaces Java/database reactor and live payment demonstration remain
+pending. No application configuration values were changed by this fix.

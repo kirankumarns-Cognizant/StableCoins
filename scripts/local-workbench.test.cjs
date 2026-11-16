@@ -92,3 +92,21 @@ test('verification removes inherited activation flags without masking profile-gu
   for(const key of ['BLOCKCHAIN_MODE','TESTNET_ENABLED','SPRING_PROFILES_ACTIVE'])assert.equal(Object.hasOwn(safe,key),false);
   assert.equal(parent.BLOCKCHAIN_MODE,'REAL_TESTNET');
 });
+
+
+test('verification isolates deployed connections while retaining Java and Docker tooling',()=>{
+  const parent={
+    IDENTITY_ISSUER_URI:'https://cognito.example.test/real-pool', BLOCKCHAIN_CHAIN_ID:'84532',
+    CONNECTIONS_CONFIG:'file:/private/demo.properties', CONNECTIONS_CONFIG_FILE:'./.local/demo.properties',
+    AI_MODEL:'deployed-model',ROUTING_AGENT_ENABLED:'true',DB_PASSWORD:'dummy-secret',
+    AWS_ACCESS_KEY_ID:'dummy-access',AWS_SECRET_ACCESS_KEY:'dummy-secret',
+    SPRING_APPLICATION_JSON:'{}',SPRING_DATASOURCE_URL:'jdbc:postgresql://deployed-db/app',
+    JAVA_HOME:'test-jdk',JAVA_TOOL_OPTIONS:'-Dapi.version=1.44',PATH:'test-path',
+    DOCKER_HOST:'unix:///var/run/docker.sock',TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE:'/var/run/docker.sock'
+  };
+  const original={...parent},safe=verificationEnvironment(parent);
+  for(const key of ['IDENTITY_ISSUER_URI','BLOCKCHAIN_CHAIN_ID','CONNECTIONS_CONFIG','CONNECTIONS_CONFIG_FILE','AI_MODEL','ROUTING_AGENT_ENABLED','DB_PASSWORD','AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','SPRING_APPLICATION_JSON','SPRING_DATASOURCE_URL'])assert.equal(Object.hasOwn(safe,key),false,key);
+  for(const key of ['JAVA_HOME','JAVA_TOOL_OPTIONS','PATH','DOCKER_HOST','TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE'])assert.equal(safe[key],parent[key]);
+  assert.deepEqual(parent,original);
+  assert.equal(safe.RUN_REAL_MODEL_TESTS,'false');
+});

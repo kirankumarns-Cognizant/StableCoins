@@ -414,3 +414,21 @@ manually mark it READY. For the next UI rehearsal after updating/restarting:
 
 The captured observation is MOCK and uses the default mock treasury address. It
 does not establish balances or funding of the separately generated real wallets.
+
+### Startup/verification completion and configuration regression
+
+`start` reports percentage completion for nine local components. `verify` reports
+percentage completion across eight stages, including final Java evidence validation;
+long stages emit a heartbeat every 15 seconds. Percentages measure finished checks,
+including failures, and do not predict remaining time. Read the final PASSED/FAILED
+status and separate failure count. Diagnostic log paths are printed before each
+verification stage. Details and examples are in
+[the local validation guide](33-LOCAL-FIRST-VALIDATION.md#completion-percentages-and-verification-configuration-isolation-2026-11-16).
+
+The failed owner run `1794847618091-8861-verify` inherited deployed Cognito/network
+settings in four configuration assertions. Verification now isolates connection
+variables and external configuration selectors in its child processes; `.env`
+and application startup are unchanged. After pulling the fix, rerun strict
+verification and share its newest result before starting a fresh payment intent.
+An optional skipped live-model case does not explain those four failures or
+establish a live model run.

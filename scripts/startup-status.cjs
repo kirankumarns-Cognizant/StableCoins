@@ -1,8 +1,27 @@
 // Console diagnostics for local startup. Never print container environment or raw logs.
 const componentNames=['postgres','localstack','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'];
 
+function progressOf(items,basis) {
+  const total=items.length,completed=items.filter(item=>item.status!=='PENDING').length;
+  return {basis,completed,total,percent:Math.floor(completed*100/total),failed:items.filter(item=>item.status==='FAILED').length};
+}
+function verificationTracker(write=console.log) {
+  const stages=new Map(['prerequisites','node','frontend-build','frontend-lint','cdk-build','cdk-tests','java','java-evidence'].map(name=>[name,{name,status:'PENDING'}]));
+  const progress=()=>progressOf([...stages.values()],'verification-stages');
+  function update(name,status) {
+    if(!stages.has(name) || !['PASSED','FAILED'].includes(status))throw Error('Invalid verification progress update');
+    if(stages.get(name).status===status)return;
+    stages.set(name,{name,status});
+    const p=progress();
+    write('['+p.completed+'/'+p.total+' | '+p.percent+'%] '+name+' | '+status);
+  }
+  const summary=()=>{const p=progress();return 'Verification progress: '+p.percent+'% | '+p.completed+'/'+p.total+' stages finished, '+p.failed+' failed';};
+  return {update,progress,summary};
+}
+
 function startupTracker(write=console.log) {
   const components=new Map([...componentNames,'react-frontend'].map(name=>[name,{name,status:'PENDING',reason:'NOT_CHECKED'}]));
+  const progress=()=>progressOf(snapshot(),'startup-components');
   let partial='';
   const snapshot=()=>[...components.values()];
   function update(name,status,reason) {
@@ -10,7 +29,7 @@ function startupTracker(write=console.log) {
     if(!previous || previous.status===status && (status==='STARTED' || previous.reason===reason))return;
     components.set(name,{name,status,reason});
     const complete=snapshot().filter(item=>item.status!=='PENDING').length;
-    write(`[${complete}/9] ${name} | ${status} | ${reason}`);
+    write(`[${complete}/9 | ${progress().percent}%] ${name} | ${status} | ${reason}`);
   }
   function output(chunk) {
     partial+=String(chunk);
@@ -26,9 +45,9 @@ function startupTracker(write=console.log) {
   }
   function summary() {
     const items=snapshot();
-    return `Components: ${items.filter(item=>item.status==='STARTED').length}/9 started, ${items.filter(item=>item.status==='FAILED').length} failed, ${items.filter(item=>item.status==='PENDING').length} pending`;
+    return `Startup progress: ${progress().percent}% | Components: ${items.filter(item=>item.status==='STARTED').length}/9 started, ${items.filter(item=>item.status==='FAILED').length} failed, ${items.filter(item=>item.status==='PENDING').length} pending`;
   }
-  return {update,output,snapshot,summary};
+  return {update,output,snapshot,summary,progress};
 }
 
 function containerChecks(output) {
@@ -45,15 +64,16 @@ function containerChecks(output) {
   });
 }
 
-async function startupStage(name,task,{write=console.log,intervalMs=15000}={}) {
+async function startupStage(name,task,{write=console.log,intervalMs=15000,progress,successStatus='STARTED'}={}) {
   const started=Date.now();
-  write(`[STARTING] ${name}`);
-  const timer=setInterval(()=>write(`[STARTING] ${name}: still working (${Math.floor((Date.now()-started)/1000)}s elapsed)`),intervalMs);
+  const suffix=()=>progress?` | ${progress().percent}% complete`: '';
+  write(`[STARTING] ${name}${suffix()}`);
+  const timer=setInterval(()=>write(`[STARTING] ${name}: still working (${Math.floor((Date.now()-started)/1000)}s elapsed)${suffix()}`),intervalMs);
   try {
     const result=await task();
-    write(`[${result?.status==='FAILED' || result?.code!==undefined && result.code!==0?'FAILED':'STARTED'}] ${name}`);
+    write(`[${result?.status==='FAILED' || result?.code!==undefined && result.code!==0?'FAILED':successStatus}] ${name}${suffix()}`);
     return result;
-  } catch(error) {write(`[FAILED] ${name}`);throw error;}
+  } catch(error) {write(`[FAILED] ${name}${suffix()}`);throw error;}
   finally {clearInterval(timer);}
 }
 
@@ -72,4 +92,4 @@ function failureMessages(report) {
   lines.push('Application readiness was not established. Existing data volumes were retained.');
   return lines;
 }
-module.exports={containerChecks,startupStage,failureMessages,startupTracker};
+module.exports={containerChecks,startupStage,failureMessages,startupTracker,verificationTracker};

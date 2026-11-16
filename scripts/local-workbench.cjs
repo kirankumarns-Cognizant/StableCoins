@@ -5,7 +5,7 @@ const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, writeSync,
 const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
-const {containerChecks,startupStage,failureMessages,startupTracker} = require('./startup-status.cjs');
+const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker} = require('./startup-status.cjs');
 const root = resolve(__dirname, '..');
 const modules = ['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'];
 const services = ['payment','compliance-quote','blockchain','ledger','reconciliation','visa'];
@@ -42,7 +42,11 @@ function run(executable, args, options = {}) {
 }
 function verificationEnvironment(parent=process.env) {
   const environment={...parent,RUN_REAL_MODEL_TESTS:'false'};
-  for(const key of ['BLOCKCHAIN_MODE','TESTNET_ENABLED','SPRING_PROFILES_ACTIVE']) delete environment[key];
+  // Verification uses test-owned settings, never a deployed identity, wallet or model.
+  // Derive connection variable names from the authoritative shared configuration.
+  const names=new Set([...readFileSync(join(root,'services/config/connections.properties'),'utf8').matchAll(/\$\{([A-Z][A-Z0-9_]*)(?=[:}])/g)].map(match=>match[1]));
+  for(const key of ['CONNECTIONS_CONFIG','CONNECTIONS_CONFIG_FILE'])names.add(key);
+  for(const key of Object.keys(environment))if(names.has(key.toUpperCase()) || key.toUpperCase().startsWith('SPRING_'))delete environment[key];
   return environment;
 }
 function javaExecutable() {return process.env.JAVA_HOME ? join(process.env.JAVA_HOME,'bin',process.platform === 'win32' ? 'java.exe':'java') : 'java';}
@@ -148,26 +152,32 @@ async function main(args=process.argv.slice(2)) {
   const file=join(directory,'report.json');
   const report={action,startedAt:new Date().toISOString(),status:'RUNNING',scope:'LOCAL_ONLY',liveAcceptance:false,checks:[]};
   const tracker=action==='start'?startupTracker():null;
+  const verification=action==='verify'?verificationTracker():null;
+  let activeVerification='prerequisites';
+  const stageOptions={progress:()=> (tracker || verification).progress()};
   const componentFor=name=>({payment:'payment-service','compliance-quote':'compliance-quote-service',blockchain:'blockchain-service',ledger:'settlement-ledger-service',reconciliation:'reconciliation-service',visa:'visa-simulator'})[name];
-  const save=()=>writeFileSync(file,JSON.stringify(report,null,2)+'\n','utf8');save();
+  const save=()=>{if(tracker || verification)report.progress=(tracker || verification).progress();writeFileSync(file,JSON.stringify(report,null,2)+'\n','utf8');};save();
   console.log(`Local ${action}; report: ${file}`);
   if(action==='start')console.log('Startup status: STARTING. Checking prerequisites, backend containers, API access and frontend readiness.');
+  if(verification)console.log(verification.summary()+' (check-based; not elapsed time or payment acceptance)');
   try {
     if(action==='doctor' || action==='verify' || action==='start') {
-      report.prerequisites=action==='start'?await startupStage('prerequisites',async()=>{
+      report.prerequisites=tracker || verification?await startupStage('prerequisites',async()=>{
         const prerequisites=await doctor();
-        return {status:Object.values(prerequisites).every(Boolean)?'PASSED':'FAILED',prerequisites};
-      }).then(result=>result.prerequisites):await doctor();
+        const ready=verification?prerequisites.node && prerequisites.java21 && prerequisites.dependencies && (!args.includes('--require-database') || prerequisites.docker && prerequisites.compose):Object.values(prerequisites).every(Boolean);
+        return {status:ready?'PASSED':'FAILED',prerequisites};
+      },{...stageOptions,successStatus:verification?'CHECKED':'STARTED'}).then(result=>result.prerequisites):await doctor();
       console.log('Prerequisites:',JSON.stringify(report.prerequisites));
     }
     if(action==='doctor') report.status=Object.values(report.prerequisites).every(Boolean)?'READY':'BLOCKED';
     if(action==='verify') {
       const p=report.prerequisites;
       if(!p.node || !p.java21 || !p.dependencies || args.includes('--require-database') && (!p.docker || !p.compose)) throw Error('Local verification prerequisites missing; see report');
+      verification.update('prerequisites','PASSED');save();
       // This command never opts into real inference or testnet profiles.
       const javaArgs=['-f','services/pom.xml','--no-transfer-progress',...(args.includes('--offline')?['-o']:[]),'verify'];
       const stages=[
-        ['node',process.execPath,['--test','frontend/tests/safety.test.mjs','services/config/read-connections.test.cjs',...readdirSync(join(root,'scripts')).filter(f=>f.endsWith('.test.cjs')).map(f=>'scripts/'+f)]],
+        ['node',process.execPath,['--test',...readdirSync(join(root,'frontend/tests')).filter(f=>f.endsWith('.test.mjs')).map(f=>'frontend/tests/'+f),'services/config/read-connections.test.cjs',...readdirSync(join(root,'scripts')).filter(f=>f.endsWith('.test.cjs')).map(f=>'scripts/'+f)]],
         ['frontend-build',process.platform==='win32'?'npm.cmd':'npm',['--prefix','frontend','run','build']],
         ['frontend-lint',process.platform==='win32'?'npm.cmd':'npm',['--prefix','frontend','run','lint']],
         ['cdk-build',process.platform==='win32'?'npm.cmd':'npm',['--prefix','infrastructure','run','build']],
@@ -175,21 +185,25 @@ async function main(args=process.argv.slice(2)) {
         ['java',join(root,'services',process.platform==='win32'?'mvnw.cmd':'mvnw'),javaArgs],
       ];
       for(const [name,executable,stageArgs] of stages) {
-        console.log(`Running ${name}...`);
+        activeVerification=name;
+        console.log(`Running ${name}; diagnostic log: ${join(directory,name+'.log')}`);
         const started=Date.now();const logPath=join(directory,name+'.log');const log=openSync(logPath,'w');
-        let result;try{result=await run(executable,stageArgs,{log,timeoutMs:1200000,
-          env:verificationEnvironment()});}finally{closeSync(log);}
+        let result;try{result=await startupStage(name,()=>run(executable,stageArgs,{log,timeoutMs:1200000,
+          env:verificationEnvironment()}),{...stageOptions,successStatus:'PASSED'});}finally{closeSync(log);}
         report.checks.push({name,status:result.code===0?'PASSED':'FAILED',exitCode:result.code,timedOut:result.timedOut,log:logPath});
+        verification.update(name,result.code===0?'PASSED':'FAILED');
         if(name==='java')report.java=freshJavaResults(started);
         save();
         if(result.code!==0)throw Error(`${name} failed; inspect its local log`);
       }
+      activeVerification='java-evidence';
       if(!report.java?.totals.tests || report.java.totals.failures || report.java.totals.errors)throw Error('No successful fresh Java test evidence');
       const skips=report.java.suites.filter(suite=>suite.skipped>0);
       // Default offline model evaluation may skip; database cases must execute in the strict gate.
       report.skippedSuites=skips.map(({name,skipped})=>({name,skipped}));
       report.databaseGate=databaseGate(report.java.suites)?'PASSED':'NOT_SATISFIED';
       if(args.includes('--require-database') && report.databaseGate!=='PASSED')throw Error('Required database/integration tests skipped or module reports missing');
+      verification.update('java-evidence','PASSED');
       report.status=report.java.totals.skipped?'PASSED_WITH_SKIPS':'PASSED';
     }
     if(action==='start') {
@@ -200,7 +214,7 @@ async function main(args=process.argv.slice(2)) {
       const logPath=join(directory,'compose.log'),log=openSync(logPath,'w');
       console.log(`Backend build/start log: ${logPath}`);
       console.log(tracker.summary());
-      let result;try{result=await startupStage('backend containers: build, start and health checks',()=>run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,onOutput:tracker.output,timeoutMs:1800000}));}finally{closeSync(log);}
+      let result;try{result=await startupStage('backend containers: build, start and health checks',()=>run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,onOutput:tracker.output,timeoutMs:1800000}),stageOptions);}finally{closeSync(log);}
       report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,reason:result.timedOut?'COMMAND_TIMEOUT':result.code===0?undefined:'BUILD_OR_CONTAINER_READINESS_FAILED',log:logPath});save();
       const inventory=await run('docker',['compose','--profile','services','ps','--all','--format','json'],{timeoutMs:10000});
       try {
@@ -220,7 +234,7 @@ async function main(args=process.argv.slice(2)) {
           if(check.status==='FAILED')tracker.update(componentFor(check.name.split(':')[0]),'FAILED',check.name+' '+(check.reason || 'HTTP '+check.httpStatus));
         });
         return {status:checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED',checks};
-      }).then(result=>result.checks):await smoke();
+      },stageOptions).then(result=>result.checks):await smoke();
       report.checks.push(...checks);
       report.status=report.checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED';
       report.scope='LOCAL_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
@@ -229,7 +243,7 @@ async function main(args=process.argv.slice(2)) {
         const frontendLog=join(directory,'frontend.log');
         console.log(`Frontend diagnostic log: ${frontendLog}`);
         try {
-          report.checks.push(await startupStage('React frontend and API proxy',()=>startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])})));
+          report.checks.push(await startupStage('React frontend and API proxy',()=>startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])}),stageOptions));
           tracker.update('react-frontend','STARTED','Application HTML and API proxy checks passed');
         } catch(error) {
           tracker.update('react-frontend','FAILED','Frontend or API proxy not ready; inspect frontend.log');
@@ -239,8 +253,9 @@ async function main(args=process.argv.slice(2)) {
         report.scope='LOCAL_FRONTEND_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
       }
     }
-  } catch(error) {report.status='FAILED';report.reason=error.message;}
+  } catch(error) {report.status='FAILED';report.reason=error.message;if(verification)verification.update(activeVerification,'FAILED');}
   if(tracker){report.components=tracker.snapshot();console.log(tracker.summary());}
+  if(verification)console.log(verification.summary());
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;

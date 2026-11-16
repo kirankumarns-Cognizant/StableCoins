@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {containerChecks,startupStage,failureMessages,startupTracker}=require('./startup-status.cjs');
+const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker}=require('./startup-status.cjs');
 
 test('Compose array and newline JSON preserve failed dependency exit codes and missing components',()=>{
   const rows=[{Service:'postgres',State:'exited',ExitCode:255,Environment:'private-value'},{Service:'localstack',State:'running',Health:'healthy'},{Service:'visa-simulator',State:'running',Health:'unhealthy'}];
@@ -20,13 +20,13 @@ test('streamed component progress handles chunk boundaries, duplicates and priva
   assert.equal(lines.length,0);
   tracker.output('thy\n Container stablecoins-postgres Healthy\n Container stablecoins-unknown Healthy\ncontainer stablecoins-visa-simulator is unhealthy\n');
   assert.equal(lines.length,2);
-  assert.match(lines[0],/^\[1\/9\] postgres \| STARTED/);
-  assert.match(lines[1],/^\[2\/9\] visa-simulator \| FAILED/);
-  assert.equal(tracker.summary(),'Components: 1/9 started, 1 failed, 7 pending');
+  assert.match(lines[0],/^\[1\/9 \| 11%\] postgres \| STARTED/);
+  assert.match(lines[1],/^\[2\/9 \| 22%\] visa-simulator \| FAILED/);
+  assert.equal(tracker.summary(),'Startup progress: 22% | Components: 1/9 started, 1 failed, 7 pending');
   assert.ok(!lines.join('\n').includes('private-value'));
   tracker.update('visa-simulator','STARTED','HEALTHY');
   tracker.update('react-frontend','FAILED','API proxy unavailable');
-  assert.equal(tracker.summary(),'Components: 2/9 started, 1 failed, 6 pending');
+  assert.equal(tracker.summary(),'Startup progress: 33% | Components: 2/9 started, 1 failed, 6 pending');
 });
 
 test('long startup emits heartbeat and cannot announce successful stage after failure',async()=>{
@@ -48,4 +48,44 @@ test('failed startup summary names components and logs without exposing raw cont
   assert.match(lines,/compose.log/);
   assert.ok(!lines.includes('Application URL:'));
   assert.deepEqual(failureMessages({action:'start',status:'PASSED'}),[]);
+});
+
+test('startup waits for frontend readiness before 100 percent and counts failures separately',()=>{
+  const tracker=startupTracker(()=>{});
+  assert.equal(tracker.progress().percent,0);
+  for(const item of tracker.snapshot().filter(item=>item.name!=='react-frontend'))tracker.update(item.name,'STARTED','HEALTHY');
+  assert.deepEqual(tracker.progress(),{basis:'startup-components',completed:8,total:9,percent:88,failed:0});
+  tracker.update('react-frontend','FAILED','PROXY_FAILED');
+  assert.equal(tracker.progress().percent,100);
+  assert.equal(tracker.progress().failed,1);
+  assert.match(tracker.summary(),/1 failed/);
+});
+
+test('verification progress includes prerequisites and final evidence without double-counting',()=>{
+  const lines=[],tracker=verificationTracker(line=>lines.push(line));
+  assert.equal(tracker.progress().percent,0);
+  for(const name of ['prerequisites','node','frontend-build','frontend-lint','cdk-build','cdk-tests'])tracker.update(name,'PASSED');
+  assert.equal(tracker.progress().percent,75);
+  tracker.update('java','PASSED');
+  tracker.update('java','PASSED');
+  assert.equal(lines.length,7);
+  assert.equal(tracker.progress().percent,87);
+  tracker.update('java-evidence','FAILED');
+  assert.deepEqual(tracker.progress(),{basis:'verification-stages',completed:8,total:8,percent:100,failed:1});
+  assert.match(tracker.summary(),/100%.*1 failed/);
+  assert.throws(()=>tracker.update('unknown','PASSED'));
+});
+
+test('verification heartbeat reports current percentage and cleans up on thrown errors',async()=>{
+  const lines=[],tracker=verificationTracker(()=>{});
+  tracker.update('prerequisites','PASSED');
+  await assert.rejects(startupStage('java',async()=>{
+    await new Promise(resolve=>setTimeout(resolve,35));
+    throw Error('test failure');
+  },{write:line=>lines.push(line),intervalMs:5,progress:tracker.progress,successStatus:'PASSED'}),/test failure/);
+  assert.ok(lines.some(line=>line.includes('still working') && line.includes('12% complete')));
+  assert.equal(lines.at(-1),'[FAILED] java | 12% complete');
+  const count=lines.length;
+  await new Promise(resolve=>setTimeout(resolve,15));
+  assert.equal(lines.length,count);
 });

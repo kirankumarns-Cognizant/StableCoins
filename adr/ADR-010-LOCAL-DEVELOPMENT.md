@@ -109,3 +109,13 @@ nine local components, emits elapsed-time heartbeats and records safe structured
 failure reasons plus log locations. It reuses existing Compose health and API
 access checks; no new service, authentication bypass or architecture change is
 introduced. Unknown build/application causes remain explicitly diagnostic work.
+
+## Check completion and isolated verification note (2026-11-16)
+
+Local startup and verification now report check-based completion percentages,
+separate failure counts and elapsed-time heartbeats. Verification subprocesses
+use test-owned connection settings rather than inheriting deployed demo overrides;
+Java/Docker tooling configuration remains available. Application configuration and
+accepted deployment architecture are unchanged. Final evidence/database gates and
+public-testnet opt-in remain authoritative. See the local validation guide for
+percentage semantics, the configuration regression and execution boundaries.
