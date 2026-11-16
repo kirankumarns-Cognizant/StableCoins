@@ -49,7 +49,8 @@ The first customer workbench request failed with `Failed to fetch`. The owner's
 subsequent screenshot confirms Customer A's verified operator, customer membership
 and `hackathon-a-v1` policy loaded successfully. That earlier screenshot had an empty funding account
 list; the later successful Customer A seed is recorded in section 4. Post-seed
-UI visibility and payment acceptance remain pending.
+New payment account/supplier selectors are confirmed by an owner screenshot;
+payment creation and subsequent acceptance remain pending.
 The API fetch previously used `credentials: omit`, which drops the browser
 cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require

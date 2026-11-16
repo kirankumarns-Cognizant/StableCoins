@@ -61,9 +61,12 @@ That is separate from the application's Cognito sign-in.
 operator subject, `PAYMENT_OPERATOR`, customer ID, `hackathon-a-v1` policy and
 successful refresh. The initial empty account list was followed by a successful
 administrator seed: customer, USD account and beneficiary inserts committed, with
-USD 100,000 of `DEMO_SIMULATED_USD` capacity. The next UI checkpoint is to refresh
-Overview, verify that account, and open New payment. Account visibility after
-seeding and subsequent payment steps are still acceptance criteria until observed.
+USD 100,000 of `DEMO_SIMULATED_USD` capacity. A subsequent New payment screenshot
+confirms account `22222222-2222-2222-2222-222222222222` and **Fictional Demo Supplier | USD**
+are selectable under the correct operator/customer. The form shows USD 1,000 and
+a USD 5 fee cap, `USDC_WALLET`, `LOWEST_COST`, `AUTO` and an unchecked confirmation.
+Submission has not yet been observed; its disabled button is expected until that
+confirmation is selected. The primary presenter scenario remains USD 10,000.
 There is currently no account/beneficiary onboarding screen in this workspace.
 
 ### Guided UI rehearsal and evidence record
@@ -88,8 +91,9 @@ allows multiple USD 10,000 demonstration instructions; it is not a real deposit.
 | Environment | Administrator setup; unified startup | Owner report `1794830715419-85490-start`: 9/9 components ready and all 18 backend probes passed. This is setup evidence. |
 | Authentication | Sign in securely; `demo-a-operator`; Overview | Owner screenshot confirms Customer A, `PAYMENT_OPERATOR` and policy `hackathon-a-v1`. |
 | Starting records | Administrator seed; see Codespaces setup | Owner psql output confirms three inserts committed and account `22222222-2222-2222-2222-222222222222` has simulated USD 100,000. This is setup, not a UI funding transaction. |
-| Current next step | Overview; `demo-a-operator`; click Refresh | Corporate funding accounts should show that active USD account and recorded demo balance. UI confirmation after seeding is pending. |
-| Next navigation | Overview > Create USD payment, or left menu > New payment | Create a payment intent should show the seeded account and Fictional Demo Supplier in the selectors. Pending UI confirmation. |
+| Account visibility | New payment; `demo-a-operator`; Corporate USD account selector | VERIFIED by owner screenshot: seeded account selected. The Overview balance panel after seeding has not been separately captured. |
+| Navigation and supplier | Overview > Create USD payment, or left menu > New payment | VERIFIED: Supplier payment instruction form displays Fictional Demo Supplier with USD currency. |
+| Current next step | New payment; review values, select confirmation, click Create payment intent | NOT RUN: primary scenario USD 10,000, fee limit USD 50, future UTC deadline, USDC_WALLET, LOWEST_COST, AUTO. Expect a payment/correlation reference and routing view after successful creation. |
 | Payment lifecycle | Continue numbered steps 8-28 below under their named roles | Intent, real runtime agent, approvals, execution, ledger, reconciliation, optional payout and public-testnet evidence each require their own observed results. Pending connected acceptance. |
 
 For every completed step retain: run date/code revision and mode; screen/path;
@@ -99,18 +103,23 @@ location when available. Mark each as VERIFIED, BLOCKED or NOT RUN. Keep future
 expected outcomes separate from actual evidence. Use an explicit recovery note
 for issues, including what changed and how the same step was rechecked.
 
-**Resume here now:** as `demo-a-operator`, open Overview and click **Refresh**.
-Expect **Evidence refreshed at...**, then the account ID above, currency USD,
-**Recorded demo balance** 100000 and **Status** ACTIVE. Explain that this is
-simulated available capacity. Click **Create USD payment** and verify **Create a
-payment intent**, the **Corporate USD account** selector and **Supplier
-beneficiary** = **Fictional Demo Supplier | USD**. Review the form before submitting.
-The initial USD 10,000 scenario uses `USDC_WALLET`, maximum fee 50, `LOWEST_COST`,
-`AUTO` and a future UTC deadline. The form initially suggests a deadline one hour
-ahead; update an expired deadline before confirming a new instruction. For this
-checkpoint, stop before **Create payment intent** until the selectors and values
-have been checked; the following numbered steps cover submission and the rest of
-the demonstration.
+**Resume here now:** remain on **New payment** as `demo-a-operator`. Explain:
+"The operator is defining a USD supplier instruction and requesting USDC wallet
+delivery. Confirmation records intent; it is not an approval or blockchain transfer."
+The account and supplier selectors are verified. For the primary demonstration,
+set **Payment amount (USD)** to `10000.00` and **Maximum fee (USD)** to `50.00`.
+The screenshot's USD 1,000 / USD 5 values are a smaller scenario, not a UI defect;
+retain the actual submitted values in the evidence if that alternative is used.
+Keep **Required delivery outcome** = `USDC_WALLET`, **Routing priority** =
+`LOWEST_COST` and **Requested route** = `AUTO`. Ensure **Deliver by (UTC, ISO
+8601)** is still in the future; the initial form suggests one hour ahead.
+Select **I confirm this USD instruction, outcome, deadline and fee limit. Fiat
+endpoints are simulated.** Then click **Create payment intent** once. Expect the
+payment's **Intent & routing** view, a payment ID and correlation ID; asynchronous
+preparation may still be pending. Record the actual response and reuse the same
+payment/retained request for recovery rather than creating duplicates. No model
+inference, approval, funding journal or blockchain settlement is proven merely by
+opening or confirming this form. Continue at numbered step 10 after creation succeeds.
 
 | Demo login | Customer | Implemented permissions | Activity |
 |---|---|---|---|
