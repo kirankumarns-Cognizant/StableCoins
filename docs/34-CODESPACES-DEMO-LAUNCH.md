@@ -228,6 +228,12 @@ status before investigating API proxy configuration. Keep the manual Vite termin
 running when using that fallback. Do not submit a payment with empty account or
 beneficiary selectors. Complete section 4's explicit fictional seed first.
 
+**Refresh evidence** reloads records when the app and API are reachable. It shows
+progress and a success/failure result; a failed refresh preserves the previous
+successful timestamp and warns that retained records may be stale. It cannot
+start a stopped process or populate an unseeded account/beneficiary list. See
+[the UI recovery behavior](32-CONNECTED-REACT-WORKSPACE.md#recovery-behavior).
+
 ## 6 Rehearse MOCK before enabling inference or public settlement
 
 Follow scenes 1-9 in the complete walkthrough. First request `USDC_WALLET`; then

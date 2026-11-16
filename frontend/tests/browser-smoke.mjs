@@ -12,6 +12,7 @@ await writeFile(resolve(artifacts,'browser-results.json'),JSON.stringify({status
 const profile=resolve(artifacts,'edge-'+Date.now());const stamp=new Date().toISOString();const future=new Date(Date.now()+3600000).toISOString()
 const pay='PAY-UI-SYNTHETIC',customer='11111111-1111-1111-1111-111111111111',reviewId='66666666-6666-4666-8666-666666666666',quoteId='77777777-7777-4777-8777-777777777777',hash='0x'+'a'.repeat(64)
 let created=false,prepared=false,agentRun=false,executed=false,expire=false,chainMode='MOCK';const approvals=new Set();const accepted=new Set();const calls=[];let firstCreate=true
+let holdCatalog=false,catalogFailure=false,catalogReads=0;const heldReads=[]
 const candidate={candidate:{candidateId:'synthetic-provider-a',providerId:'SIMULATED-A',rail:'STABLECOIN',outcome:'USDC_WALLET',network:{name:'base-sepolia',chainId:84532}},eligibility:'ELIGIBLE',totalCostUsd:'1.50',deliveryMillis:6000,successRate:'0.99',fraudScore:'0.01',findings:[],itemizedCosts:[{component:'GAS',nativeAmount:'0.00001',nativeAsset:'ETH',comparisonAmountUsd:'0.02'}],evidenceModes:['MOCK','SIMULATED'],evidence:['SUCCESS_RATE','LATENCY','TRANSACTION_COST','FRAUD_RISK','RAIL_AVAILABILITY','LIQUIDITY','EXTERNAL_DATA'].map((signalType,index)=>({signalId:'signal-'+index,signalType,sourceId:'synthetic-fixture',evidenceMode:'SIMULATED',quality:'ACCEPTABLE',observedAt:stamp,expiresAt:future}))}
 const review=()=>({recommendationId:reviewId,version:1,state:executed?'EXECUTED':approvals.size>=2?'APPROVED':'PROPOSED',approvalCount:approvals.size,requiredApprovals:2,createdAt:stamp,expiresAt:future,document:{rationale:'SYNTHETIC UI TEST',quote:{quoteId,version:1,providerId:'SIMULATED-A',sourceAmountUsd:'10000.00',transferAmountUsdc:'10000',payoutAmounts:{},totalFeeUsd:'1.50',expiresAt:future,simulated:true},assessment:{status:'ASSESSED',preferredCandidateId:'synthetic-provider-a',assessedAt:stamp,expiresAt:future,candidates:[candidate]},evidence:{observations:candidate.evidence},intent:{}}})
 const payment=()=>({paymentId:pay,correlationId:'CORR-UI-SYNTHETIC',amount:'10000.00',sourceCurrency:'USD',status:executed?'RECONCILED':'COMPLIANCE_APPROVED',intent:{instruction:{requiredOutcome:'USDC_WALLET',deliverBy:future,maximumFee:'25.00',priority:'LOWEST_COST'},policy:{requiredApprovals:2}}})
@@ -22,6 +23,12 @@ const fixture=createHttpServer(async(req,res)=>{
  const reply=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value))}
  if(expire)return reply({code:'AUTHENTICATION_REQUIRED'},401)
  if(!actor.startsWith('synthetic-'))return reply({code:'CUSTOMER_ACCESS_DENIED'},403)
+ if(req.method==='GET' && path==='/payments/workbench'){
+  catalogReads++
+  if(catalogFailure)return reply({code:'HTTP_502'},502)
+  if(holdCatalog)await new Promise(resolve=>heldReads.push(resolve))
+  if(res.destroyed)return
+ }
  if(req.method==='POST'){
   calls.push({path,actor,key:req.headers['idempotency-key'],raw})
   if(path==='/payments'){created=true;if(firstCreate){firstCreate=false;return reply({code:'SYNTHETIC_LOST_ACK'},503)}return reply({paymentId:pay},201)}
@@ -63,6 +70,12 @@ try{
  const screenshot=async name=>{const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(resolve(artifacts,name+'.png'),Buffer.from(result.data,'base64'))}
  await send('Runtime.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:'http://127.0.0.1:5190/'})
  await until(()=>has('Sign in with your organization'),'sign in page');await signIn('synthetic-operator');await until(()=>has('Corporate funding accounts'),'overview');check('customer catalog loaded without a browser role selector',!(await ev('Boolean(document.querySelector("[name=role]"))')))
+ holdCatalog=true;await click('Refresh');await until(()=>heldReads.length===1,'held catalog refresh');const readsWhileHeld=catalogReads
+ check('refresh shows progress and prevents repeated clicks',await has('Refreshing application evidence...')&&await ev('[...document.querySelectorAll("button")].filter(e=>e.textContent==="Refreshing...").every(e=>e.disabled)'))
+ await delay(5500);check('five-second polling does not abort or duplicate a slow refresh',catalogReads===readsWhileHeld)
+ holdCatalog=false;heldReads.splice(0).forEach(resolve=>resolve());await until(()=>has('Evidence refreshed at'),'refresh completion')
+ catalogFailure=true;await click('Refresh');await until(()=>has('Evidence refresh failed (HTTP 502)'),'failed refresh feedback');check('failed refresh retains last successful data and explains unavailable API',await has('Corporate funding accounts')&&await has('last successful refresh time is unchanged'))
+ catalogFailure=false;await click('Refresh evidence');await until(async()=>await has('Evidence refreshed at')&&!await has('Evidence refresh failed'),'refresh recovery');check('Refresh evidence recovers reads without submitting financial commands',calls.length===0)
  await click('New payment');await until(()=>has('Supplier payment instruction'),'new payment');await ev('document.querySelector("input[type=checkbox]").click()');await click('Create payment intent');await until(()=>has('SYNTHETIC_LOST_ACK'),'uncertain response');await delay(400);check('mutation was not automatically retried',calls.filter(c=>c.path==='/payments').length===1)
  await click('Refresh');await delay(250);check('successful reads retain unresolved command warning',await has('SYNTHETIC_LOST_ACK'));await click('Retry original instruction');await until(()=>has(pay),'created payment');const creates=calls.filter(c=>c.path==='/payments');check('uncertain create retried exact body and original key',creates.length===2&&creates[0].key===creates[1].key&&creates[0].raw===creates[1].raw)
  await click('Prepare / refresh recommendation');await until(()=>has('Deterministic provider comparison'),'prepared');check('no fabricated model recommendation before a run',await has('No model run is recorded'))

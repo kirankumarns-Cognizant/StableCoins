@@ -18,13 +18,14 @@ export default function App(){
  const [agent,setAgent]=useState<AgentRun|null>(null);const [journey,setJourney]=useState<Journey|null>(null)
  const [hash,setHash]=useState(window.location.hash);const route=parseRoute(hash)
  const [error,setError]=useState('');const [commandError,setCommandError]=useState('');const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);const [updated,setUpdated]=useState('')
+ const [refreshing,setRefreshing]=useState(false);const [refreshResult,setRefreshResult]=useState('')
  const knownHash=useRef(window.location.hash)
  const epoch=useRef(0);const active=useRef<AbortController|null>(null);const callbackStarted=useRef(false)
  const base=apiRoot(connections.apiBaseUrl,location.origin)
- const reset=useCallback(()=>{epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setCommandError('');setNotice('')},[])
+ const reset=useCallback(()=>{epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setRefreshing(false);setRefreshResult('');setCommandError('');setNotice('')},[])
  useEffect(()=>{const handler=()=>{
   const before=parseRoute(knownHash.current),after=parseRoute(location.hash);knownHash.current=location.hash
-  if(before.paymentId!==after.paymentId||before.review!==after.review){epoch.current++;active.current?.abort();setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setError('');setCommandError('');setBusy(false)}
+  if(before.paymentId!==after.paymentId||before.review!==after.review){epoch.current++;active.current?.abort();setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setError('');setCommandError('');setBusy(false);setRefreshing(false);setRefreshResult('')}
   setHash(location.hash)
  };addEventListener('hashchange',handler);return()=>removeEventListener('hashchange',handler)},[])
  useEffect(()=>{window.scrollTo(0,0)},[hash])
@@ -37,7 +38,9 @@ export default function App(){
  },[])
  useEffect(()=>{if(!session)return;const timer=setTimeout(()=>{reset();setError('Session expired. Sign in again; unresolved command keys have been retained.')},Math.max(0,session.expiresAt-Date.now()));return()=>clearTimeout(timer)},[session,reset])
  const load=useCallback(async()=>{
-  if(!session)return;active.current?.abort();const controller=new AbortController();active.current=controller;const generation=epoch.current
+  // Polling must not cancel a slow read before its request timeout can complete.
+  if(!session || active.current && !active.current.signal.aborted)return
+  const controller=new AbortController();active.current=controller;const generation=epoch.current;setRefreshing(true)
   const get=<T,>(path:string)=>request<T>(base,session.token,path,{signal:controller.signal})
   try{
    const c=await get<Catalog>('/payments/workbench');let p:Payment|null=null,e:Evidence|null=null,j:Journey|null=null,r:Recommendation|null=null,a:AgentRun|null=null
@@ -45,10 +48,19 @@ export default function App(){
     if(reviewId){r=await get<Recommendation>(path+'/recommendations/'+encodeURIComponent(String(reviewId)));const run=e.agentRuns.find(run=>run.recommendation_id===reviewId);if(run)a=await get<AgentRun>(path+'/recommendations/'+encodeURIComponent(String(reviewId))+'/agent-runs/'+encodeURIComponent(String(run.run_id)))}
    }
    if(controller.signal.aborted||generation!==epoch.current)return
-   setCatalog(c);setPayment(p);setEvidence(e);setJourney(j);setReview(r);setAgent(a);setUpdated(new Date().toISOString());setError('')
-  }catch(failure){if(controller.signal.aborted||generation!==epoch.current)return;if(failure instanceof ApiError&&failure.status===401)reset();setError(failure instanceof Error?failure.message:'Unable to read application evidence')}
+   const completed=new Date().toISOString()
+   setCatalog(c);setPayment(p);setEvidence(e);setJourney(j);setReview(r);setAgent(a);setUpdated(completed);setError('');setRefreshResult('Evidence refreshed at '+time(completed)+'.')
+  }catch(failure){
+   if(controller.signal.aborted||generation!==epoch.current)return
+   if(failure instanceof ApiError&&failure.status===401){reset();setError('Session is no longer authorized. Sign in again.');return}
+   let message=failure instanceof Error?failure.message:'Unable to read application evidence'
+   if(failure instanceof ApiError && [502,503,504].includes(failure.status))message=`Evidence refresh failed (HTTP ${failure.status}). The application API is unavailable. Retry after service connectivity is restored.`
+   else if(failure instanceof TypeError)message='Unable to reach the application API. Check connectivity, then refresh evidence again.'
+   else if(failure instanceof Error && failure.name==='TimeoutError')message='The evidence request timed out. Check service availability, then refresh evidence again.'
+   setError(message);setRefreshResult('Refresh failed at '+time(new Date().toISOString())+'. The last successful refresh time is unchanged; previously loaded data may be out of date.')
+  }finally{if(active.current===controller){active.current=null;if(generation===epoch.current)setRefreshing(false)}}
  },[session,base,route.paymentId,route.review,reset])
- useEffect(()=>{const initial=setTimeout(()=>void load(),0);const timer=setInterval(()=>{if(!document.hidden&&!busy)void load()},5000);return()=>{clearTimeout(initial);clearInterval(timer);active.current?.abort()}},[load,busy])
+ useEffect(()=>{if(busy)return;const initial=setTimeout(()=>void load(),0);const timer=setInterval(()=>{if(!document.hidden)void load()},5000);return()=>{clearTimeout(initial);clearInterval(timer);active.current?.abort()}},[load,busy])
  async function command(path:string,body:unknown,name?:string){
   if(!session||!catalog||busy)throw new Error('An authenticated, ready session is required')
   const generation=epoch.current;setBusy(true);setError('');setCommandError('');setNotice('')
@@ -68,9 +80,10 @@ export default function App(){
   <div className="workspace"><header className="topbar"><span>Cross-border B2B payments</span><div><Badge>TEST ENVIRONMENT</Badge>{session&&<button className="quiet" onClick={()=>{reset();setNotice('Local session cleared. Sign in as the next authorized user.')}}>Sign out / switch user</button>}</div></header>
   <main id="main" tabIndex={-1}><div className="intro"><div><p className="eyebrow">STABLECOIN PAYMENT PLATFORM</p><h1>{!session?'Connect to your payment workspace':route.page==='/payments/new'?'Create a payment intent':payment?tabs.find(([id])=>id===route.tab)?.[1]:'Payment overview'}</h1><p>USD funding to USDC treasury to blockchain settlement to optional fiat payout.</p></div>{payment&&<button className="secondary" onClick={exportEvidence}>Export evidence</button>}</div>
   <div className="truth-banner"><strong>Demonstration boundaries</strong><span>Funding, conversion, compliance, FX, Visa and bank credit are simulated. Blockchain is real only when recorded evidence says TESTNET / LIVE. Application ledger entries are separate accounting records.</span></div>
-  {error&&<div role="alert" className="alert">{error}{session&&<button onClick={()=>void load()}>Refresh evidence</button>}</div>}{commandError&&<div role="alert" className="alert">{commandError}</div>}{notice&&<p role="status" className="notice">{notice}</p>}
+  {error&&<div role="alert" className="alert">{error}{session&&<button disabled={busy||refreshing} onClick={()=>void load()}>{refreshing?'Refreshing...':'Refresh evidence'}</button>}</div>}{commandError&&<div role="alert" className="alert">{commandError}</div>}{notice&&<p role="status" className="notice">{notice}</p>}
+  {session&&<p role="status" aria-live="polite" className="muted">{refreshing?'Refreshing application evidence...':refreshResult}</p>}
   {!session?<SignIn onSession={value=>{epoch.current++;setSession(value);setError('')}} onError={setError}/>:<>
-   <div className="session-strip"><span><strong>{catalog?.actorId??'Verifying identity...'}</strong> | {catalog?.roles.join(' + ')??'Server membership required'}</span><span>Customer {catalog?.customerId??'pending'} | Refreshed {time(updated)}</span><button className="quiet" disabled={busy} onClick={()=>void load()}>Refresh</button></div>
+   <div className="session-strip"><span><strong>{catalog?.actorId??'Verifying identity...'}</strong> | {catalog?.roles.join(' + ')??'Server membership required'}</span><span>Customer {catalog?.customerId??'pending'} | Last successful refresh {time(updated)}</span><button className="quiet" disabled={busy||refreshing} onClick={()=>void load()}>{refreshing?'Refreshing...':'Refresh'}</button></div>
    {!catalog?<Card title="Connecting to the application"><p>The API must validate your token and server-managed membership. No demonstration data is substituted if it is unavailable.</p></Card>:route.page==='/payments/new'?<NewPayment key={catalog.customerId} catalog={catalog} enabled={enabled} onCreate={body=>command('/payments',body,'create')}/>:!route.paymentId?<Overview catalog={catalog}/>:payment&&evidence?<PaymentViews payment={payment} evidence={evidence} review={review} agent={agent} journey={journey} tab={route.tab} customerId={catalog.customerId} enabled={enabled} approver={catalog.roles.includes('PAYMENT_APPROVER')} act={act}/>:<Card title="Loading payment evidence"><p>Reading customer-authorized records. Commands remain unavailable until evidence loads.</p></Card>}
   </>}
   <footer>StableFlow | Evidence-led stablecoin settlement | No production money moves in this demonstration.</footer></main></div>

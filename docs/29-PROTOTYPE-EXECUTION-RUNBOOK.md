@@ -216,6 +216,17 @@ For recording, write the **actual observed result** beside each completed number
 step. An expected result in this guide is not a completed test. See the detailed
 scenes below for recovery behavior and additional narration.
 
+**Refresh and recovery checkpoint:** click **Refresh evidence** in an API-error
+banner, or **Refresh** in the identity strip, to reload the current authorized
+records. Expect **Refreshing...** and a progress message, then a success time or
+an explicit failed-refresh message. Repeated clicks are disabled while the read
+is active; five-second polling does not cancel a slow refresh. On failure, the
+last successful refresh time stays unchanged and previously loaded data may be
+out of date. Restore API connectivity before retrying an HTTP 502/503/504. Refresh
+does not start a stopped frontend/backend, create an account or retry a financial
+command. An empty account list after a successful refresh requires the separate
+fictional-data setup in step 6.
+
 ## Scene 1 - Treasury Dashboard
 
 **Open:** the React application, then **Overview** (`#/overview`).

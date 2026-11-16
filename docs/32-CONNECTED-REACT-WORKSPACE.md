@@ -95,8 +95,14 @@ Only its explicit `public.*` allowlist enters the browser build:
 Authorization-code flow uses S256 PKCE. Only the short-lived verifier/state is
 stored in sessionStorage; it is consumed once and rejected after ten minutes or
 on mismatch. Callback code is removed from the address bar before exchange.
-Access tokens stay in React memory. API fetch omits cookies, refuses redirects,
-has a timeout, and requires same-origin or explicitly configured HTTPS API access.
+Access tokens stay in React memory. The owner has applied the API cookie fix in the
+active Codespace: API fetch uses `credentials: same-origin`,
+refuses redirects, has a timeout, and requires same-origin or explicitly configured
+HTTPS API access. Same-origin cookies let the private Codespaces forwarding
+gateway recognize the signed-in GitHub browser. Cross-origin API requests do not
+include cookies. Cookies do not grant application access: the API still requires
+the Cognito bearer token and server-owned customer membership. The cross-origin
+Cognito token exchange continues to omit cookies.
 Server JWT validation and membership remain the authorization boundary. A 401 or
 local signout clears all displayed customer data and cancels pending read requests.
 Local signout does not claim to revoke the identity provider's global SSO session.
@@ -151,9 +157,20 @@ Public settings are build-time configuration: rebuild the bundle when they chang
 ## Recovery behavior
 
 Reads poll every five seconds while the tab is visible and no command is busy.
-Use **Refresh** or **Refresh evidence** to fetch current server records. Read
-failures disable commands; no success or empty balance is fabricated. Selecting
-a different payment cancels stale reads so a late response cannot overwrite it.
+A poll skips an already active read instead of aborting and restarting it. Slow
+APIs can therefore complete within the existing per-request timeout. Selecting a
+different payment or signing out still cancels stale reads so a late response
+cannot overwrite the newly selected customer/payment.
+
+Use **Refresh** or **Refresh evidence** to fetch current server records. Both are
+disabled during a refresh and show **Refreshing...**; the live status reports
+progress, success time or failure time. **Last successful refresh** changes only
+after a complete successful read. On failure, previously loaded records stay
+visible with an explicit out-of-date warning and commands remain disabled.
+HTTP 502/503/504, connection failures and timeouts explain that API availability
+must be restored before retrying. No success or empty balance is fabricated.
+Refresh performs reads only: it does not restart servers, seed missing accounts,
+repeat a failed payment command or submit a replacement blockchain transaction.
 
 Before a mutation needing a key, the UI saves its key and exact body in
 customer-scoped sessionStorage. An uncertain payment-creation outcome locks its
@@ -174,6 +191,15 @@ step 10. A malformed/incompatible response produces an explicit rendering error,
 not a replacement transaction or a silent mock fallback.
 
 ## Verification and outstanding live acceptance
+
+Refresh regression check, 2026-11-16: frontend build, lint and all 14 unit checks
+passed. The headless browser rehearsal passed 23/23 checks, including a read held
+longer than the five-second polling interval, disabled duplicate refresh controls,
+HTTP 502 feedback, retained last-successful evidence and successful read-only
+recovery. The first browser attempt was blocked by Windows sandbox GPU-process
+permissions; the rerun outside that sandbox passed. These are synthetic UI checks,
+not live service, identity, model, ledger or public-chain acceptance. Architecture,
+server authorization and financial mutation responsibilities are unchanged.
 
 See [step 9 verification](step9-build-results.json) for executed checks and scope.
 The browser rehearsal in `frontend/tests/browser-smoke.mjs` uses only a synthetic
