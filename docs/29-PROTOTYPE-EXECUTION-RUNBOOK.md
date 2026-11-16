@@ -99,7 +99,8 @@ allows multiple USD 10,000 demonstration instructions; it is not a real deposit.
 | Account visibility | New payment; `demo-a-operator`; Corporate USD account selector | VERIFIED by owner screenshot: seeded account selected. The Overview balance panel after seeding has not been separately captured. |
 | Navigation and supplier | Overview > Create USD payment, or left menu > New payment | VERIFIED: Supplier payment instruction form displays Fictional Demo Supplier with USD currency. |
 | Intent creation | New payment > confirm instruction > Create payment intent | VERIFIED by owner screenshot: PAY-52272AAC4E14, USD 1,000, USD 5 cap, USDC_WALLET; routing view shows COMPLIANCE_APPROVED and Recommendation pending. |
-| Current next step | Intent & routing > Prepare / refresh recommendation; demo-a-operator | NOT RUN: wait for preparation and recorded provider comparison or an explicit blocked/error result. No runtime agent inference or settlement is established yet. |
+| Recommendation preparation | Intent & routing > Prepare / refresh recommendation; demo-a-operator | BLOCKED: owner screenshots show accepted PENDING followed by REVIEW_REQUIRED / PREPARATION_TIMEOUT. Automatic refresh displayed the transition. No completed recommendation, runtime inference or settlement is established. |
+| Current next step | Retain the same payment; diagnose preparation evidence | Determine whether provider quotes, treasury observation or event delivery/processing failed. Do not repeatedly prepare or execute while blocked. |
 | Payment lifecycle | Continue numbered steps 8-28 below under their named roles | Intent, real runtime agent, approvals, execution, ledger, reconciliation, optional payout and public-testnet evidence each require their own observed results. Pending connected acceptance. |
 
 For every completed step retain: run date/code revision and mode; screen/path;
@@ -114,8 +115,14 @@ for issues, including what changed and how the same step was rechecked.
 payment ID for both approvers and later evidence. Explain: "The confirmed request
 is USD 1,000 for USDC wallet delivery with a USD 5 fee ceiling. Simulated compliance
 has approved it; the system now needs quotes and current routing evidence."
-Click **Prepare / refresh recommendation** in **Prepare a governed recommendation**.
-Wait for the server's recorded outcome and refresh status. On success inspect the
+The owner already clicked **Prepare / refresh recommendation** in **Prepare a
+governed recommendation**. The request moved from **PENDING** to
+**REVIEW_REQUIRED**, reason **PREPARATION_TIMEOUT**. Automatic polling displayed
+this transition; the text-styled **Refresh** control also requests a read, and
+does not restart preparation. Keep this payment open and diagnose event delivery,
+provider quotes and treasury observation before retrying preparation. The service
+normally waits up to the configured preparation timeout (default 120 seconds);
+the screenshot alone does not identify the failing dependency. On success inspect the
 provider comparison, eligible/excluded paths, quote fees and evidence freshness.
 A pending state, no eligible route or an explicit error is an outcome to inspect;
 do not claim a usable recommendation before it appears. The button prepares
@@ -124,6 +131,31 @@ not prove a real model call or execute funding, signing or blockchain settlement
 If the fee cap excludes all routes, record that constraint rather than changing
 this immutable intent or inventing a cheaper quote. Continue to the separately
 recorded **Run reasoning agent** step only when the recommendation is ready.
+
+### Complete navigation map and current position
+
+The current rehearsal uses USD 1,000 with a USD 5 fee cap. These are the observed
+instruction values; USD 10,000 remains the primary future presenter scenario.
+
+| Order | UI path and actor | Purpose, action and expected outcome | Current rehearsal |
+|---|---|---|---|
+| 1 | Application URL > Sign in securely; demo-a-operator | Cognito authenticates; API resolves Customer A and PAYMENT_OPERATOR. | VERIFIED |
+| 2 | Overview > Corporate funding accounts | Inspect simulated USD capacity and governed customer policy. Account selector and policy verified; post-seed Overview balance capture remains pending. | PARTLY VERIFIED |
+| 3 | New payment > Supplier payment instruction > confirm > Create payment intent | Pin account, beneficiary, amount, fee ceiling, deadline and wallet outcome; obtain payment ID. | VERIFIED: PAY-52272AAC4E14 |
+| 4 | Intent & routing > Prepare / refresh recommendation; operator | Gather provider quotes, treasury observation and routing signals; produce an eligible deterministic recommendation. | BLOCKED: PREPARATION_TIMEOUT |
+| 5 | Intent & routing > Deterministic provider comparison > Run reasoning agent; operator | Inspect seven signals, then record actual configured model inference and its explanation. | NOT RUN; requires step 4 |
+| 6 | Treasury readiness; operator | Inspect USDC liquidity, ETH gas budget, network, mode and evidence freshness. | NOT RUN |
+| 7 | Quote & approvals; demo-a-approver-one | Review exact valid version, Accept this quote, Approve this version. Verify returned identity. | NOT RUN |
+| 8 | Same payment > Quote & approvals; demo-a-approver-two | Independently review and approve the same valid version; require two distinct approvers. | NOT RUN |
+| 9 | Execution journey; return to demo-a-operator | Verify approvals, select authorization checkbox, Execute approved USDC payment. Follow simulated funding/conversion, real application journals and configured chain execution. | NOT RUN |
+| 10 | Blockchain evidence; operator | Inspect hash, receipt, wallets, USDC amount, gas and confirmations; independently inspect public transaction only for actual TESTNET evidence. | NOT RUN |
+| 11 | Ledger & reconciliation; operator, acting as finance reviewer | Inspect immutable per-asset balanced journals, reconciliation findings and final recorded closure. | NOT RUN |
+| 12 | Optional fiat payout | For this USDC_WALLET payment, explain that payout is not required. Demonstrate simulated bank delivery with a separate properly configured payment and fresh approvals. | NOT RUN |
+| 13 | Export evidence | Retain matching payment, model, ledger and chain evidence plus screenshots. | NOT RUN |
+
+Steps 5 onward describe the intended continuation, not completed acceptance.
+Diagnostic backend commands do not bypass these UI controls. The detailed numbered
+walkthrough below supplies the narrative, role checks and recovery conditions.
 
 | Demo login | Customer | Implemented permissions | Activity |
 |---|---|---|---|

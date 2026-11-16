@@ -52,8 +52,12 @@ list; the later successful Customer A seed is recorded in section 4. Post-seed
 New payment account/supplier selectors are confirmed by an owner screenshot;
 a subsequent routing screenshot confirms PAY-52272AAC4E14 was created for USD 1,000
 with a USD 5 fee limit, COMPLIANCE_APPROVED state and Recommendation pending.
-Recommendation preparation, runtime agent execution and payment settlement remain
-to be demonstrated through the UI.
+The owner then requested recommendation preparation: the UI displayed PENDING,
+followed by REVIEW_REQUIRED with PREPARATION_TIMEOUT. Automatic refresh displayed
+the transition. Retain this payment and diagnose provider quotes, treasury evidence
+and event processing before retrying; the failing dependency is not yet established.
+Runtime agent execution and payment settlement remain to be demonstrated through
+the UI. See the runbook's complete navigation map for the remaining screen path.
 The API fetch previously used `credentials: omit`, which drops the browser
 cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require
