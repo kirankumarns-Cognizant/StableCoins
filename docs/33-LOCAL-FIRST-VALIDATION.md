@@ -105,15 +105,30 @@ not delete or reset the database, seed balances, post journals or submit payment
 Use `docker compose --profile services ps` to inspect a failed startup; the local
 report links its Compose log. Image pulls/builds require network and disk space.
 
-After Compose and all 18 health/access probes pass, `start` prints
-`Server startup completed. All six backend services are healthy and access checks passed.`
-It then prints the application URL (port 5173) and backend `/health` URL (port
-8080). In Codespaces these use the current `CODESPACE_NAME` and
-`GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN`, rather than a hardcoded Codespace.
-Outside Codespaces they use localhost. React/Vite must be running separately on
-port 5173; the helper does not start the UI. Keep forwarded ports Private.
-A failed or blocked startup never prints these success messages or URLs.
-This reports backend readiness, not completed sign-in or payment acceptance.
+After Compose and all 18 backend health/access probes pass, `start` launches the
+existing React/Vite frontend as a detached development process with a log linked
+from its report. It derives the exact Codespaces host allowlist and sets the
+frontend-only proxy target to the configured host payment-service origin. It
+reuses an already healthy StableFlow Vite server and refuses an unrelated or
+unready listener on port 5173; stop an older manual Vite terminal with Ctrl+C
+before retrying in that case. It never kills another port owner or opens a browser.
+
+The helper checks the development-server marker, application HTML and the
+proxied anonymous API denial (401) before announcing:
+`Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.`
+It prints the application URL (5173) and backend `/health` URL (8080), using current
+Codespaces environment variables or localhost outside Codespaces. Keep forwarded
+ports Private. The frontend lasts until its process or the Codespace is stopped;
+re-run `start` after resuming a stopped Codespace. `smoke` remains a backend-only
+read-only check. Neither command establishes completed sign-in or payment acceptance.
+A failed or blocked startup never prints success messages or application URLs.
+
+Concurrent Java cold starts can take several minutes. Application container health
+grace defaults to `LOCAL_SERVICE_HEALTH_START_PERIOD=240s`; Compose readiness has
+`LOCAL_START_WAIT_SECONDS=600`, and frontend readiness has
+`LOCAL_FRONTEND_START_TIMEOUT_MS=30000`. These are local development controls in
+`.env.example` and shared configuration, not production capacity measurements.
+Health failures still fail startup; increasing grace does not bypass health checks.
 
 The 18 read-only probes require all six health routes to return 200 and each
 service to return 401 for both missing identity and a forged bearer token. They

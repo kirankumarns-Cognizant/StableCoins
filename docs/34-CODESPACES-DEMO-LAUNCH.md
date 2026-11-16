@@ -1,6 +1,6 @@
 # Codespaces launch and demonstration
 
-Updated 2026-11-15. GitHub destination: [StableCoins](https://github.com/kirankumarns-Cognizant/StableCoins).
+Updated 2026-11-16. GitHub destination: [StableCoins](https://github.com/kirankumarns-Cognizant/StableCoins).
 AWS destination: account `640237069320`, application Region `us-east-1`, IAM Identity Center authentication.
 The owner requested step 11 preparation before AWS deployment. Codespaces is the
 container host for acceptance; deploying the application to AWS is a later gate.
@@ -11,12 +11,46 @@ The connected React application and six Java services are implemented. The
 commercial rehearsal, two customer configurations and evidence checklist are
 in [the proof package](35-HACKATHON-PROOF-PACKAGE.md). The complete presenter
 narrative, roles, exact clicks and expected outcomes are in
-[the screen walkthrough](29-PROTOTYPE-EXECUTION-RUNBOOK.md).
+[the screen walkthrough](29-PROTOTYPE-EXECUTION-RUNBOOK.md#numbered-presenter-navigation-url-login-roles-actions-and-outcomes),
+which includes the current UI URL, named demo users, Cognito/role explanation and
+numbered navigation from first login through final evidence capture.
 
 An HTML prototype or synthetic browser screenshot is not a connected demo.
 Actual Codespaces startup, PostgreSQL tests, Cognito sign-in, inference and a
 public-testnet payment must be recorded separately. Required identity and wallet
-resources have not yet been supplied. No completed live run is asserted here.
+resources must be configured and tested. No completed live run is asserted here.
+
+### Owner-reported progress (2026-11-16)
+
+Codespaces verification ran 610 Java tests: 609 passed, with only the opt-in
+`RoutingAgentLiveTest` skipped. The required PostgreSQL gate passed. After
+Cognito configuration, startup report `1794821303277-17464-start` and smoke
+report `1794821530920-24765-smoke` both passed; all six services were healthy.
+The owner provisioned a dedicated Cognito pool, public browser client, separate
+internal client/scope, six users and server-owned customer memberships. A small
+OpenAI inference succeeded outside the application, and its key is stored in
+Secrets Manager. No secret values belong in this document.
+
+The first customer workbench request failed with `Failed to fetch`. The owner's
+subsequent screenshot confirms Customer A's verified operator, customer membership
+and `hackathon-a-v1` policy loaded successfully. Its funding account list is empty;
+fictional account/beneficiary seeding and payment acceptance remain pending.
+The API fetch previously used `credentials: omit`, which drops the browser
+cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
+keep port 5173 private, use `/api/v1` on the UI origin, and continue to require
+the Cognito bearer token. Cross-origin cookie forwarding stays disabled and
+redirects remain rejected. The owner also enabled `PAYMENT_FLOW_ENABLED=true`;
+without it the workbench route was disabled. This identity/catalog observation
+does not establish a successful connected payment. Later screenshots showed an
+API `HTTP_502`, followed by no listener on frontend port 5173; diagnose service
+availability separately from Cognito or missing fictional customer records.
+
+The non-secret mounted `.local/demo-connections.properties` must be readable
+by the container user (0644 in this demo); keep `.env` and credential-bearing
+files private (0600). When setting demo passwords in CloudShell, the Boto3
+`admin_set_user_password` call with hidden `getpass` input worked. The CLI
+`--cli-input-json file:///dev/stdin` path failed JSON parsing in that session.
+Do not print passwords while diagnosing it.
 
 ## 1 Open the project in Codespaces
 
@@ -149,8 +183,10 @@ node --env-file=.env scripts/local-workbench.cjs smoke
 docker compose --profile services ps
 ```
 
-Expected: all six services healthy, migrations applied, and 18 health/access-denial
-probes pass. Inspect a failing service privately; do not paste complete environment
+Expected: all six services healthy, migrations applied, 18 health/access-denial
+probes pass, and `start` verifies the React app and its same-origin API proxy.
+Only then does it print the startup-completed message and application URL.
+Inspect a failing service privately; do not paste complete environment
 or logs containing secrets. Preserve volumes on failure. Apply the existing
 [wallet and bank seeds](30-PAYMENT-FLOW-INTEGRATION.md#codespaces-demonstration)
 with the approved nonzero beneficiary testnet wallet. For the second customer,
@@ -169,19 +205,28 @@ outside that controlled preparation.
 2. Set `FRONTEND_DEV_ALLOWED_HOSTS` to that exact hostname, and
    `IDENTITY_REDIRECT_URI` to that origin plus `/auth/callback` in `.env`. Register
    that exact callback in Cognito. Keep `PUBLIC_API_BASE_URL=/api/v1`.
-3. The Vite process runs on the Codespace host; its payment proxy target must be
-   `http://localhost:8080`. Container-to-container URLs must retain their service
-   DNS names. Do not globally replace `PAYMENT_SERVICE_URL` in Compose with host
-   localhost. Set the proxy target only for the frontend launch:
+3. The updated `start` helper launches/reuses Vite, derives the exact current
+   Codespaces allowlist and supplies its host payment-service proxy target.
+   Container-to-container URLs retain their service DNS names. Do not globally
+   replace `PAYMENT_SERVICE_URL` in Compose with host localhost. For manual
+   troubleshooting only, keep a separate terminal running this frontend command:
 
 ```bash
-PAYMENT_SERVICE_URL=http://localhost:8080 npm --prefix frontend run dev -- --host 0.0.0.0
+FRONTEND_DEV_ALLOWED_HOSTS="${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}" PAYMENT_SERVICE_URL=http://127.0.0.1:8080 npm --prefix frontend run dev -- --host 0.0.0.0
 ```
 
 4. Use **Open in Browser** for port 5173. Click **Sign in securely**. Expected:
    Cognito authenticates the operator and **Overview** shows only their customer.
    Restart Vite after changes to public settings. A private forwarded port may
    first require GitHub sign-in; that is distinct from the application's Cognito login.
+
+If the browser is unreachable, first check `curl --max-time 10 -I http://127.0.0.1:5173/`
+from a second Codespaces terminal. Connection refused means the frontend listener
+is absent; a forwarded URL alone cannot start it. If the page loads with `HTTP_502`,
+check `curl --max-time 10 -i http://127.0.0.1:8080/health` and the backend container
+status before investigating API proxy configuration. Keep the manual Vite terminal
+running when using that fallback. Do not submit a payment with empty account or
+beneficiary selectors. Complete section 4's explicit fictional seed first.
 
 ## 6 Rehearse MOCK before enabling inference or public settlement
 
@@ -202,8 +247,11 @@ For actual settlement first complete [the guarded testnet setup](20-BLOCKCHAIN-T
 Treasury needs sufficient test USDC for the quoted amount and test ETH for gas.
 The existing Compose defaults deliberately force MOCK and testnet off; editing
 only `.env` is insufficient. Use a reviewed explicit override selecting the testnet
-Spring profile, `BLOCKCHAIN_MODE=TESTNET`, `TESTNET_ENABLED=true`, matching RPC/
-chain/token settings and the secret-backed signer. Check the effective mode before
+Spring profile, `BLOCKCHAIN_MODE=REAL_TESTNET`, `TESTNET_ENABLED=true`, matching RPC/
+chain/token settings and the existing local environment-key signer. Store its disposable testnet key
+in a repository-scoped Codespaces Secret and forward it only to blockchain-service
+through the reviewed override; do not put the value in the override file. AWS
+Secrets Manager/KMS signing is still step-10 work. Check the effective mode before
 authorizing any payment. Setup and funding are not yet executed for this environment.
 
 ## 7 Capture proof and stop safely
@@ -225,3 +273,25 @@ retain its evidence before stopping services. Then stop the Codespace from GitHu
 to stop compute usage; do not delete it until needed local evidence is backed up
 securely. Finish AWS deployment only after acceptance and the outstanding
 infrastructure/security work, as tracked in the delivery plan.
+
+## Wallet generation in the Codespaces terminal
+
+The existing wallet tool is a standalone developer utility, not another service.
+Its source package is explicitly retained in Git despite the general wallets
+ignore rule. From an interactive Codespaces terminal at the project root:
+
+```bash
+./services/mvnw -f scripts/generate-test-wallets/pom.xml verify --no-transfer-progress
+java -jar scripts/generate-test-wallets/target/generate-test-wallets.jar
+```
+
+Enter separate wallet passwords directly at the hidden terminal prompts. The
+utility writes encrypted V3 keystores under ignored `.local/wallets`, prints
+public addresses only, refuses to replace existing wallets and never connects
+to a chain. It does not automatically load the encrypted keystore into the current
+environment-key signer. Key loading for that signer requires a separate secure
+operator step; never print a private key or paste it into chat. Obtain sufficient
+test USDC and test ETH before attempting the primary USD 10,000 scenario.
+
+`REAL_TESTNET` is the backend mode enum. `DEMO_EVIDENCE_MODE=TESTNET` is the
+independent runner's evidence label; they are different configuration fields.

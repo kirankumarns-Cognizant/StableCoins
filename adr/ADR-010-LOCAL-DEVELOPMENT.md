@@ -93,3 +93,13 @@ all named persistence suites to run successfully. Codespaces exposed immutable
 response JSON decoding and integration fixture isolation defects; fixes and
 execution boundaries are recorded in [the local validation guide](../docs/33-LOCAL-FIRST-VALIDATION.md#codespaces-verification-findings-2026-11-15).
 No AWS deployment or real settlement is established by these changes.
+
+## Unified development startup note (2026-11-16)
+
+The existing local helper now starts/reuses the React Vite server after Compose
+and backend access checks. It verifies the app and same-origin API proxy before
+printing a usable UI URL, without opening browsers or adding a deployable service.
+Local Java cold-start grace and bounded startup waits are configurable. This
+implements the accepted local development strategy; AWS hosting and financial
+execution boundaries are unchanged. See the local validation guide and the
+[numbered presenter navigation](../docs/29-PROTOTYPE-EXECUTION-RUNBOOK.md#numbered-presenter-navigation-url-login-roles-actions-and-outcomes).

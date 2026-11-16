@@ -3,11 +3,11 @@ const assert=require('node:assert/strict');
 const {command,parseSuites,localUrl,probe,doctor,smoke,databaseGate,verificationEnvironment,startupMessages,main}=require('./local-workbench.cjs');
 const {readConnections}=require('../services/config/read-connections.cjs');
 
-test('successful startup prints current Codespaces frontend and backend health URLs without claiming the UI was started',()=>{
+test('successful unified startup prints current Codespaces frontend and backend health URLs',()=>{
   const messages=startupMessages({action:'start',status:'PASSED'},{CODESPACE_NAME:'demo-space-123',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'});
   assert.ok(messages.includes('Application URL: https://demo-space-123-5173.app.github.dev/'));
   assert.ok(messages.includes('Backend health URL: https://demo-space-123-8080.app.github.dev/health'));
-  assert.match(messages.join('\n'),/frontend must be running separately/);
+  assert.match(messages.join('\n'),/React and all six backend services are ready/);
 });
 test('startup URLs use loopback outside Codespaces and never render malformed forwarding variables',()=>{
   for(const environment of [{},{CODESPACE_NAME:'demo',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'https://user:secret@external.test'},{CODESPACE_NAME:'demo\nforged message',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}]) {

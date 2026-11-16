@@ -87,6 +87,14 @@ test('approved accounting mappings and manual-write controls stay server-only', 
 });
 
 
+test('local startup waits are configurable and stay outside browser configuration',()=>{
+ const config=readConnections({LOCAL_START_WAIT_SECONDS:'700',LOCAL_FRONTEND_START_TIMEOUT_MS:'40000'});
+ assert.equal(config['local.validation.compose-wait-seconds'],'700');
+ assert.equal(config['local.validation.frontend-start-timeout-ms'],'40000');
+ const exposed=JSON.stringify(publicConnections(config));
+ assert.ok(!exposed.includes('700') && !exposed.includes('40000'));
+});
+
 test('internal identity client and scope never enter browser configuration', () => {
  const c=readConnections({IDENTITY_SERVICE_CLIENT_ID:'privateInternalClient',IDENTITY_SERVICE_SCOPE:'tenant/internal'});
  assert.equal(c['connections.identity.service-client-id'],'privateInternalClient');

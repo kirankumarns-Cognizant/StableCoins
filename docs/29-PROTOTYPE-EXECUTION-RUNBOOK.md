@@ -45,6 +45,177 @@ controller and auditor are narrative personas. The implemented grants remain
 PAYMENT_OPERATOR and PAYMENT_APPROVER. Independent approvers need distinct verified
 subjects; approvers reading these screens also need PAYMENT_OPERATOR.
 
+## Numbered presenter navigation: URL, login, roles, actions and outcomes
+
+Updated 2026-11-16. Use this sequence for the connected application, then use the
+scenes below for the detailed narrative on each screen. The current Codespaces UI is:
+
+<https://zany-space-barnacle-97pjwprrpw7wh7459-5173.app.github.dev/>
+
+This address belongs to the current Codespace; use the application URL printed by
+successful startup when the Codespace changes. Keep the forwarded port Private.
+GitHub may first ask for GitHub sign-in to access that private forwarded port.
+That is separate from the application's Cognito sign-in.
+
+**Observed checkpoint:** the owner's browser screenshot confirms Customer A's
+operator subject, `PAYMENT_OPERATOR`, customer ID and `hackathon-a-v1` policy load.
+The same screenshot shows **No active accounts configured for this customer**.
+Payment creation and the remaining steps below are acceptance instructions, not
+claims of a completed run. An administrator must provision the fictional customer
+account and beneficiary using the existing setup procedure before step 7. There
+is currently no account/beneficiary onboarding screen in this workspace.
+
+| Demo login | Customer | Implemented permissions | Activity |
+|---|---|---|---|
+| `demo-a-operator` | A: `11111111-1111-1111-1111-111111111111` | `PAYMENT_OPERATOR` | Create intent, prepare routing, run agent, inspect evidence and request authorized execution |
+| `demo-a-approver-one` | A | `PAYMENT_OPERATOR` + `PAYMENT_APPROVER` | Independently review and approve the pinned version |
+| `demo-a-approver-two` | A | `PAYMENT_OPERATOR` + `PAYMENT_APPROVER` | Supply the second distinct approval of the same version |
+| `demo-b-operator` | B: `55555555-5555-5555-5555-555555555555` | `PAYMENT_OPERATOR` | Demonstrate customer isolation and configuration reuse |
+| `demo-b-approver-one`, `demo-b-approver-two` | B | `PAYMENT_OPERATOR` + `PAYMENT_APPROVER` | Approve B's separate instruction under two distinct identities |
+
+Passwords are entered only on the Cognito sign-in page. Do not put them in this
+document, screenshots, terminal output or exported evidence. Treasury operator,
+finance controller and auditor are presentation personas; they are not additional
+implemented permission grants.
+
+1. **Open the URL above.** Introduce the corporate USD instruction, USDC treasury
+   settlement and optional simulated bank payout. Explain the demonstration
+   boundaries banner before interacting. Expect **Connect to your payment workspace**.
+2. **Click Sign in securely.** This is the actual button label (rather than
+   "Secure Login"). Expect redirection to the configured Amazon Cognito login.
+3. **Sign in as `demo-a-operator`.** Enter that user's privately configured password
+   and complete any challenge presented by Cognito. This user initiates Customer A's
+   supplier payment; an approver identity is not needed for creation.
+4. **Explain authentication while the application returns.** The browser uses an
+   authorization code with PKCE against the public Cognito browser client; it has
+   no client secret. Cognito authenticates the user and issues tokens. The API
+   validates the bearer access token and resolves the verified subject through
+   server-managed customer membership and permissions. A Cognito login alone does
+   not grant customer access; browser-selected roles are not authoritative. The
+   separate internal client and `stablecoins/internal` scope are for service calls,
+   not for human sign-in. Access tokens stay in browser memory.
+5. **On Overview, verify the identity strip.** Expect actor
+   `247824c8-3061-70d6-0d45-6955c0015bb6`, `PAYMENT_OPERATOR`, Customer A's ID,
+   and policy `hackathon-a-v1`. Explain USD 50 maximum fee, permitted wallet/bank
+   outcomes and two distinct approvals. If these do not match, stop this customer's
+   demo and correct identity/membership configuration.
+6. **Inspect Corporate funding accounts.** Explain that the displayed USD balance
+   represents simulated funding capacity. If the list is empty, pause the payment
+   sequence and complete the administrator's fictional account/beneficiary setup
+   in [the Codespaces guide](34-CODESPACES-DEMO-LAUNCH.md#4-start-the-six-services-and-seed-fictional-data).
+   Refresh **Overview** and confirm an active USD account with enough capacity.
+   This does not deposit real USD or prefund a blockchain wallet.
+7. **Click New payment** in the left menu, or **Create USD payment** on Overview.
+   Expect **Create a payment intent** and the **Supplier payment instruction** form.
+8. **Complete the supplier instruction.** Select the configured **Corporate USD
+   account** and **Supplier beneficiary**. Enter **Payment amount (USD)** =
+   `10000.00`, **Required delivery outcome** = `USDC_WALLET`, **Maximum fee (USD)**
+   within policy, a future **Deliver by (UTC, ISO 8601)**, **Routing priority** =
+   `LOWEST_COST`, and **Requested route** = `AUTO` or `STABLECOIN`. Explain that the
+   intended beneficiary outcome constrains the routes that may be recommended.
+9. **Review and confirm, then click Create payment intent.** Select the explicit
+   confirmation checkbox first. Expect a payment ID, correlation ID and confirmed
+   intent, followed by **Intent & routing**. Save the payment ID and page URL so
+   approvers can reopen the same instruction. An uncertain creation response uses
+   **Retry original instruction**, preserving the original idempotency key.
+10. **On Intent & routing, click Prepare / refresh recommendation.** Explain that
+    the existing services perform simulated compliance/quote preparation and gather
+    treasury/provider evidence. Wait for the recorded preparation/recommendation;
+    a pending or rejected result does not permit the next financial action.
+11. **Inspect Deterministic provider comparison.** Expand the seven-signal details:
+    success rate, latency, transaction cost, fraud risk, rail availability, liquidity
+    conditions and external data. Explain eligibility and provenance. Simulated
+    observations remain simulated even if the later settlement uses a public chain.
+12. **Click Run reasoning agent.** Explain that the configured OpenAI or Bedrock
+    model reasons over permitted read-only tools and evidence. Expect a successful
+    recorded model run, provider/model, recommendation and concise explanation.
+    A disabled/failed run is not AI proof. The agent cannot approve, sign, submit
+    transactions or write ledger entries. Capture headline screenshot 1 here.
+13. **Click Treasury readiness.** Explain prefunding and inspect available/reserved
+    USDC, available/reserved ETH, network, contract, observation time and gas estimate.
+    USDC is the supplier's settlement principal; ETH pays blockchain computation
+    fees. In TESTNET mode the treasury must already hold enough test USDC and test
+    ETH. Simulated USD conversion does not mint or acquire those test tokens.
+14. **Click Quote & approvals.** Explain the exact provider, amount, fees, expiry
+    and immutable review/quote versions. Retain this payment's URL. Both approvers
+    must decide on the same valid version. If it expires, prepare a fresh version
+    and obtain fresh approvals; do not reuse decisions from the earlier version.
+15. **Open the same payment as `demo-a-approver-one`.** Use an independently signed-in
+    browser profile for each demo identity where practical; private Codespaces
+    forwarding may require GitHub sign-in in each profile. If using **Sign out /
+    switch user**, verify the returned subject before proceeding: the current
+    button clears the local session, but Cognito may retain its SSO session and
+    return the previous user. Full provider logout remains a pending UI improvement.
+    Expect the first approver's subject `34888428-6031-70b4-4976-83af1d3c9c8b` and
+    both permissions in the identity strip, scoped to Customer A.
+16. **As approver one, review, click Accept this quote, then Approve this version.**
+    Explain that this records an independent decision on the pinned financial
+    obligation. Expand **Recorded approval decisions** and check actor/version/time.
+    One approval does not satisfy Customer A's two-person threshold.
+17. **Open the same payment as `demo-a-approver-two`.** Confirm subject
+    `c47804e8-8011-7069-bec0-261bdc17db22`, Customer A and both permissions. Review
+    the same valid version, then click **Accept this quote** and **Approve this
+    version**. Expect two distinct approvers; signing in twice as one user is not
+    a second independent approval.
+18. **Return to `demo-a-operator` and refresh the payment.** Confirm the operator
+    identity and that the current review meets the approval threshold. Explain
+    that the initiating operator requests execution after independent authorization;
+    the runtime model does not authorize the financial transfer.
+19. **Click Execution journey.** Review the execution context, select its explicit
+    authorization checkbox and click **Execute approved USDC payment**. Expect one
+    version-bound execution reference. Execution gates, liquidity and valid approvals
+    must all be configured; a disabled action is a prerequisite to resolve, not
+    an instruction to bypass controls.
+20. **Follow Audited payment journey and Execution status.** Explain simulated
+    USD funding/conversion, real application journal posting, treasury balance/gas
+    checks, signing, submission and confirmation handling in that order. In TESTNET
+    mode, signing authorizes the USDC transfer, submission produces its transaction
+    hash, and confirmation checks its receipt/status/confirmations. In MOCK mode,
+    chain evidence is synthetic. Preserve uncertain execution references; never
+    blindly resubmit or create a replacement payment to hide an unknown result.
+21. **Click Blockchain evidence.** Inspect mode, chain ID, token contract, wallets,
+    amount, hash, receipt, block, gas and confirmations. For actual LIVE public-testnet
+    evidence, click **Independently inspect public transaction** and compare the
+    public receipt and USDC Transfer log. Capture headline screenshot 3. A MOCK
+    hash or explorer-shaped URL does not prove a blockchain transfer.
+22. **Click Ledger & reconciliation.** Explain that the blockchain is settlement
+    infrastructure and the application maintains separate immutable double-entry
+    journals. Inspect each journal, asset, account, reference and its balanced
+    debits/credits. Funding/conversion, principal, gas and optional payout are
+    accounted for separately; USD cannot balance against USDC or ETH.
+23. **Inspect Reconciliation and closure.** Expand **Immutable reconciliation report
+    and findings** and compare ledger, payment, chain and any payout references.
+    Expect server-recorded `RECONCILED` and closure `COMPLETED` only when all required
+    evidence matches. Pending, mismatched or review-required outcomes remain visible.
+    Capture headline screenshot 2, including the actual report and journal evidence.
+24. **Click Export evidence.** Retain the authorized evidence JSON and the three
+    screenshots from this same payment with code revision, mode, payment/correlation
+    IDs and timestamps. Do not include access tokens, passwords or private keys.
+25. **Demonstrate optional fiat delivery using a separate payment.** As Customer A's
+    operator, select a matching bank beneficiary and `SIMULATED_BANK_INR` or
+    `SIMULATED_BANK_USD`, with `AUTO` or `STABLECOIN_PLUS_VISA`. Repeat steps 8-23,
+    including both independent approvals. Open **Optional fiat payout** to explain
+    the simulated conversion, Visa reference, payout status and bank-credit outcome.
+    Recheck the payout journals and final reconciliation. On the wallet-only payment,
+    explain **A fiat payout is not required**; do not claim a bank credit occurred.
+26. **Demonstrate reuse as `demo-b-operator`.** Verify Customer B, its wallet-only
+    policy and USD 25 fee limit. Expect only B's catalog/payments; A's payment must
+    not become readable by entering its URL. After B's fictional data is configured,
+    repeat the wallet flow with B's two distinct approvers. The same services and
+    agent implementation are reused through customer-specific configuration.
+27. **Show controlled failures on separate rehearsal instructions.** Use the scene-10
+    procedures for stale quotes, insufficient liquidity, unavailable providers,
+    model failure or reconciliation mismatch. Explain the observed blocked/pending
+    result and recovery without mutating posted entries or retrying transfers blindly.
+28. **Close on the successful payment's three evidence screens.** State exactly which
+    model, identity, database and chain integrations actually executed, which
+    financial endpoints were simulated, and which acceptance items remain open.
+    The current app runs in Codespaces; AWS application deployment is a later gate.
+
+For recording, write the **actual observed result** beside each completed numbered
+step. An expected result in this guide is not a completed test. See the detailed
+scenes below for recovery behavior and additional narration.
+
 ## Scene 1 - Treasury Dashboard
 
 **Open:** the React application, then **Overview** (`#/overview`).

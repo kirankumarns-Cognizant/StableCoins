@@ -4,6 +4,7 @@ const {spawn} = require('node:child_process');
 const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync, openSync, closeSync} = require('node:fs');
 const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
+const {startFrontend} = require('./local-frontend.cjs');
 const root = resolve(__dirname, '..');
 const modules = ['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'];
 const services = ['payment','compliance-quote','blockchain','ledger','reconciliation','visa'];
@@ -116,10 +117,10 @@ function startupMessages(report, environment=process.env) {
   const forwarded=typeof name==='string' && /^[a-z0-9-]+$/i.test(name) && typeof domain==='string' && /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(domain);
   const origin=port=>forwarded?`https://${name}-${port}.${domain}`:`http://localhost:${port}`;
   return [
-    'Server startup completed. All six backend services are healthy and access checks passed.',
+    'Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.',
     `Application URL: ${origin(5173)}/`,
     `Backend health URL: ${origin(8080)}/health`,
-    'The React frontend must be running separately on port 5173 before opening the application. Keep Codespaces ports Private.',
+    'Keep Codespaces ports Private. Sign-in and full payment acceptance are separate checks.',
   ];
 }
 async function main(args=process.argv.slice(2)) {
@@ -169,10 +170,12 @@ async function main(args=process.argv.slice(2)) {
       report.status=report.java.totals.skipped?'PASSED_WITH_SKIPS':'PASSED';
     }
     if(action==='start') {
-      if(!report.prerequisites.docker || !report.prerequisites.compose)throw Error('A reachable Docker engine and Compose are required; no installation or AWS deployment attempted');
+      if(!Object.values(report.prerequisites).every(Boolean))throw Error('Startup prerequisites missing; see report. No installation or AWS deployment attempted');
+      const waitSeconds=Number(readConnections()['local.validation.compose-wait-seconds']);
+      if(!Number.isSafeInteger(waitSeconds) || waitSeconds<60 || waitSeconds>1200)throw Error('Invalid local Compose startup timeout');
       // Compose defaults keep MOCK/testnet-off. Existing owner migrations and queue initialization are authoritative.
       const logPath=join(directory,'compose.log'),log=openSync(logPath,'w');
-      let result;try{result=await run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout','240'],{log,timeoutMs:1200000});}finally{closeSync(log);}
+      let result;try{result=await run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,timeoutMs:1800000});}finally{closeSync(log);}
       report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,log:logPath});save();
       if(result.code!==0)throw Error('Compose startup failed; inspect the local log. Existing volumes were retained');
     }
@@ -180,6 +183,17 @@ async function main(args=process.argv.slice(2)) {
       report.checks.push(...await smoke());
       report.status=report.checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED';
       report.scope='LOCAL_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
+      if(action==='start' && report.status==='PASSED') {
+        const config=readConnections();
+        const frontendLog=join(directory,'frontend.log');
+        try {
+          report.checks.push(await startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])}));
+        } catch(error) {
+          report.checks.push({name:'frontend-start',status:'FAILED',log:frontendLog});
+          throw error;
+        }
+        report.scope='LOCAL_FRONTEND_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
+      }
     }
   } catch(error) {report.status='FAILED';report.reason=error.message;}
   report.completedAt=new Date().toISOString();save();
