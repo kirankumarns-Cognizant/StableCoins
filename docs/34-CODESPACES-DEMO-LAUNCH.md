@@ -47,8 +47,9 @@ Secrets Manager. No secret values belong in this document.
 
 The first customer workbench request failed with `Failed to fetch`. The owner's
 subsequent screenshot confirms Customer A's verified operator, customer membership
-and `hackathon-a-v1` policy loaded successfully. Its funding account list is empty;
-fictional account/beneficiary seeding and payment acceptance remain pending.
+and `hackathon-a-v1` policy loaded successfully. That earlier screenshot had an empty funding account
+list; the later successful Customer A seed is recorded in section 4. Post-seed
+UI visibility and payment acceptance remain pending.
 The API fetch previously used `credentials: omit`, which drops the browser
 cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require
@@ -206,6 +207,28 @@ or logs containing secrets. Preserve volumes on failure. Apply the existing
 with the approved nonzero beneficiary testnet wallet. For the second customer,
 use the optional identifiers documented in the proof package. Seeds never refill
 an existing balance or replace an approved recipient. Run them after migrations.
+
+For the current dedicated Customer A rehearsal, the owner supplied these public
+addresses: treasury `0xFBB95f462fC41D6B44C427e6E44E3c1f4b21C551` and beneficiary
+`0xB83a9FEE3557C7Fd1d206BeAfd989A8ba8533A07`. The encrypted local wallet files
+were confirmed to match those addresses; that does not establish treasury token
+funding or Codespaces signer configuration. Reuse the intended beneficiary for
+this seed; a different wallet requires an explicit separate demo setup.
+
+```bash
+docker compose exec -T postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v supplier_wallet=0xB83a9FEE3557C7Fd1d206BeAfd989A8ba8533A07' < scripts/seed-wallet-demo.sql
+```
+
+Owner output on 2026-11-16 confirms BEGIN, three `INSERT 0 1` results and COMMIT,
+with USD 100,000 in `DEMO_SIMULATED_USD` account
+`22222222-2222-2222-2222-222222222222`. The supplier uses beneficiary ID
+`33333333-3333-3333-3333-333333333333`. This is administrator provisioning of
+fictional starting records, not a UI funding action or settlement proof. There
+is no onboarding/top-up UI currently. Payment-specific funding, ledger posting
+and execution remain subsequent application actions. Re-running the seed does
+not replenish spent capacity. Return to the UI and follow the runbook's
+[guided rehearsal checkpoint](29-PROTOTYPE-EXECUTION-RUNBOOK.md#guided-ui-rehearsal-and-evidence-record):
+Overview > Refresh > inspect Corporate funding accounts > Create USD payment.
 
 Fiat-bank scenarios also require explicit simulated provider prefunding using the
 protected procedure in [the payout guide](31-SETTLEMENT-PAYOUT-RECONCILIATION.md).

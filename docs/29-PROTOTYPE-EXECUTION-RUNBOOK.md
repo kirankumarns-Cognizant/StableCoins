@@ -57,13 +57,60 @@ successful startup when the Codespace changes. Keep the forwarded port Private.
 GitHub may first ask for GitHub sign-in to access that private forwarded port.
 That is separate from the application's Cognito sign-in.
 
-**Observed checkpoint:** the owner's browser screenshot confirms Customer A's
-operator subject, `PAYMENT_OPERATOR`, customer ID and `hackathon-a-v1` policy load.
-The same screenshot shows **No active accounts configured for this customer**.
-Payment creation and the remaining steps below are acceptance instructions, not
-claims of a completed run. An administrator must provision the fictional customer
-account and beneficiary using the existing setup procedure before step 7. There
-is currently no account/beneficiary onboarding screen in this workspace.
+**Observed checkpoint (2026-11-16):** the owner's browser confirms Customer A's
+operator subject, `PAYMENT_OPERATOR`, customer ID, `hackathon-a-v1` policy and
+successful refresh. The initial empty account list was followed by a successful
+administrator seed: customer, USD account and beneficiary inserts committed, with
+USD 100,000 of `DEMO_SIMULATED_USD` capacity. The next UI checkpoint is to refresh
+Overview, verify that account, and open New payment. Account visibility after
+seeding and subsequent payment steps are still acceptance criteria until observed.
+There is currently no account/beneficiary onboarding screen in this workspace.
+
+### Guided UI rehearsal and evidence record
+
+Use the UI navigation below to drive the remaining acceptance work. For each
+screen, state its role and business context before clicking, compare the visible
+result with the expected result, and record the outcome. If a UI/API defect blocks
+the step, retain the same payment and evidence, fix the underlying implementation,
+verify it, and update this runbook's navigation/recovery notes before resuming.
+Backend commands are preparation or explicit diagnosis; record them as such
+instead of presenting them as completed UI actions. Do not execute a payment by
+CLI merely to claim that the corresponding UI path passed.
+
+The completed SQL seed provisions fictional starting capacity; it does not fund
+a particular payment, debit its account, post that payment's funding journal,
+convert USD, or prefund the treasury's blockchain wallet. Those payment-specific
+steps must be observed later through the approved execution journey. USD 100,000
+allows multiple USD 10,000 demonstration instructions; it is not a real deposit.
+
+| Checkpoint | Screen / role / action | Expected result and current evidence |
+|---|---|---|
+| Environment | Administrator setup; unified startup | Owner report `1794830715419-85490-start`: 9/9 components ready and all 18 backend probes passed. This is setup evidence. |
+| Authentication | Sign in securely; `demo-a-operator`; Overview | Owner screenshot confirms Customer A, `PAYMENT_OPERATOR` and policy `hackathon-a-v1`. |
+| Starting records | Administrator seed; see Codespaces setup | Owner psql output confirms three inserts committed and account `22222222-2222-2222-2222-222222222222` has simulated USD 100,000. This is setup, not a UI funding transaction. |
+| Current next step | Overview; `demo-a-operator`; click Refresh | Corporate funding accounts should show that active USD account and recorded demo balance. UI confirmation after seeding is pending. |
+| Next navigation | Overview > Create USD payment, or left menu > New payment | Create a payment intent should show the seeded account and Fictional Demo Supplier in the selectors. Pending UI confirmation. |
+| Payment lifecycle | Continue numbered steps 8-28 below under their named roles | Intent, real runtime agent, approvals, execution, ledger, reconciliation, optional payout and public-testnet evidence each require their own observed results. Pending connected acceptance. |
+
+For every completed step retain: run date/code revision and mode; screen/path;
+username and server-resolved role/customer; business context; exact values and
+clicks; expected versus observed result; payment/correlation IDs and evidence
+location when available. Mark each as VERIFIED, BLOCKED or NOT RUN. Keep future
+expected outcomes separate from actual evidence. Use an explicit recovery note
+for issues, including what changed and how the same step was rechecked.
+
+**Resume here now:** as `demo-a-operator`, open Overview and click **Refresh**.
+Expect **Evidence refreshed at...**, then the account ID above, currency USD,
+**Recorded demo balance** 100000 and **Status** ACTIVE. Explain that this is
+simulated available capacity. Click **Create USD payment** and verify **Create a
+payment intent**, the **Corporate USD account** selector and **Supplier
+beneficiary** = **Fictional Demo Supplier | USD**. Review the form before submitting.
+The initial USD 10,000 scenario uses `USDC_WALLET`, maximum fee 50, `LOWEST_COST`,
+`AUTO` and a future UTC deadline. The form initially suggests a deadline one hour
+ahead; update an expired deadline before confirming a new instruction. For this
+checkpoint, stop before **Create payment intent** until the selectors and values
+have been checked; the following numbered steps cover submission and the rest of
+the demonstration.
 
 | Demo login | Customer | Implemented permissions | Activity |
 |---|---|---|---|
