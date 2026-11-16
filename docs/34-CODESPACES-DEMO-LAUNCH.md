@@ -50,7 +50,10 @@ subsequent screenshot confirms Customer A's verified operator, customer membersh
 and `hackathon-a-v1` policy loaded successfully. That earlier screenshot had an empty funding account
 list; the later successful Customer A seed is recorded in section 4. Post-seed
 New payment account/supplier selectors are confirmed by an owner screenshot;
-payment creation and subsequent acceptance remain pending.
+a subsequent routing screenshot confirms PAY-52272AAC4E14 was created for USD 1,000
+with a USD 5 fee limit, COMPLIANCE_APPROVED state and Recommendation pending.
+Recommendation preparation, runtime agent execution and payment settlement remain
+to be demonstrated through the UI.
 The API fetch previously used `credentials: omit`, which drops the browser
 cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require

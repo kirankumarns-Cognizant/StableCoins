@@ -65,8 +65,13 @@ USD 100,000 of `DEMO_SIMULATED_USD` capacity. A subsequent New payment screensho
 confirms account `22222222-2222-2222-2222-222222222222` and **Fictional Demo Supplier | USD**
 are selectable under the correct operator/customer. The form shows USD 1,000 and
 a USD 5 fee cap, `USDC_WALLET`, `LOWEST_COST`, `AUTO` and an unchecked confirmation.
-Submission has not yet been observed; its disabled button is expected until that
-confirmation is selected. The primary presenter scenario remains USD 10,000.
+The following screenshot verifies creation of **PAY-52272AAC4E14** for USD 1,000,
+with the USD 5 cap, `USDC_WALLET`, `LOWEST_COST` and the confirmed immutable intent.
+The routing page shows **COMPLIANCE_APPROVED** and **Recommendation pending**.
+The correlation reference is visible in the UI; copy it from the application or
+export rather than transcribing the small screenshot text. The primary USD 10,000
+scenario remains a future separate demonstration; continue this existing USD 1,000
+payment without editing its pinned intent or creating a replacement.
 There is currently no account/beneficiary onboarding screen in this workspace.
 
 ### Guided UI rehearsal and evidence record
@@ -93,7 +98,8 @@ allows multiple USD 10,000 demonstration instructions; it is not a real deposit.
 | Starting records | Administrator seed; see Codespaces setup | Owner psql output confirms three inserts committed and account `22222222-2222-2222-2222-222222222222` has simulated USD 100,000. This is setup, not a UI funding transaction. |
 | Account visibility | New payment; `demo-a-operator`; Corporate USD account selector | VERIFIED by owner screenshot: seeded account selected. The Overview balance panel after seeding has not been separately captured. |
 | Navigation and supplier | Overview > Create USD payment, or left menu > New payment | VERIFIED: Supplier payment instruction form displays Fictional Demo Supplier with USD currency. |
-| Current next step | New payment; review values, select confirmation, click Create payment intent | NOT RUN: primary scenario USD 10,000, fee limit USD 50, future UTC deadline, USDC_WALLET, LOWEST_COST, AUTO. Expect a payment/correlation reference and routing view after successful creation. |
+| Intent creation | New payment > confirm instruction > Create payment intent | VERIFIED by owner screenshot: PAY-52272AAC4E14, USD 1,000, USD 5 cap, USDC_WALLET; routing view shows COMPLIANCE_APPROVED and Recommendation pending. |
+| Current next step | Intent & routing > Prepare / refresh recommendation; demo-a-operator | NOT RUN: wait for preparation and recorded provider comparison or an explicit blocked/error result. No runtime agent inference or settlement is established yet. |
 | Payment lifecycle | Continue numbered steps 8-28 below under their named roles | Intent, real runtime agent, approvals, execution, ledger, reconciliation, optional payout and public-testnet evidence each require their own observed results. Pending connected acceptance. |
 
 For every completed step retain: run date/code revision and mode; screen/path;
@@ -103,23 +109,21 @@ location when available. Mark each as VERIFIED, BLOCKED or NOT RUN. Keep future
 expected outcomes separate from actual evidence. Use an explicit recovery note
 for issues, including what changed and how the same step was rechecked.
 
-**Resume here now:** remain on **New payment** as `demo-a-operator`. Explain:
-"The operator is defining a USD supplier instruction and requesting USDC wallet
-delivery. Confirmation records intent; it is not an approval or blockchain transfer."
-The account and supplier selectors are verified. For the primary demonstration,
-set **Payment amount (USD)** to `10000.00` and **Maximum fee (USD)** to `50.00`.
-The screenshot's USD 1,000 / USD 5 values are a smaller scenario, not a UI defect;
-retain the actual submitted values in the evidence if that alternative is used.
-Keep **Required delivery outcome** = `USDC_WALLET`, **Routing priority** =
-`LOWEST_COST` and **Requested route** = `AUTO`. Ensure **Deliver by (UTC, ISO
-8601)** is still in the future; the initial form suggests one hour ahead.
-Select **I confirm this USD instruction, outcome, deadline and fee limit. Fiat
-endpoints are simulated.** Then click **Create payment intent** once. Expect the
-payment's **Intent & routing** view, a payment ID and correlation ID; asynchronous
-preparation may still be pending. Record the actual response and reuse the same
-payment/retained request for recovery rather than creating duplicates. No model
-inference, approval, funding journal or blockchain settlement is proven merely by
-opening or confirming this form. Continue at numbered step 10 after creation succeeds.
+**Resume here now:** remain signed in as `demo-a-operator` on
+`#/payments/PAY-52272AAC4E14/routing` (**Intent & routing**). Retain this URL and
+payment ID for both approvers and later evidence. Explain: "The confirmed request
+is USD 1,000 for USDC wallet delivery with a USD 5 fee ceiling. Simulated compliance
+has approved it; the system now needs quotes and current routing evidence."
+Click **Prepare / refresh recommendation** in **Prepare a governed recommendation**.
+Wait for the server's recorded outcome and refresh status. On success inspect the
+provider comparison, eligible/excluded paths, quote fees and evidence freshness.
+A pending state, no eligible route or an explicit error is an outcome to inspect;
+do not claim a usable recommendation before it appears. The button prepares
+quotes, treasury evidence and seven signals through existing services. It does
+not prove a real model call or execute funding, signing or blockchain settlement.
+If the fee cap excludes all routes, record that constraint rather than changing
+this immutable intent or inventing a cheaper quote. Continue to the separately
+recorded **Run reasoning agent** step only when the recommendation is ready.
 
 | Demo login | Customer | Implemented permissions | Activity |
 |---|---|---|---|
