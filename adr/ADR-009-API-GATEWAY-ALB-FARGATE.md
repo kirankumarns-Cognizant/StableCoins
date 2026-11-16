@@ -62,3 +62,15 @@ private. UI decimal-string/BigInt display checks preserve per-asset precision,
 while the existing ledger, agent authority and approval/execution services remain
 authoritative. No architectural decision or accepted status changes. See
 [connected UI design](../docs/32-CONNECTED-REACT-WORKSPACE.md).
+
+## Open-tab demo session continuity note - 2026-11-16
+
+The existing public-client PKCE flow now retains refresh tokens only in memory
+and renews access tokens through the configured HTTPS token endpoint when the
+shared IDENTITY_AUTO_REFRESH_ENABLED flag is true (default). There is no extra
+application idle/absolute timeout. Provider expiry/revocation, API JWT validation,
+customer membership and financial approval/quote deadlines remain authoritative.
+Same-screen return after reauthentication retains only an allowlisted application
+route in one-time PKCE state. No new service, persistent token store or alternate
+authentication boundary is introduced; the accepted decision is unchanged. See
+[connected UI design](../docs/32-CONNECTED-REACT-WORKSPACE.md).

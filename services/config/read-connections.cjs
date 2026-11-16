@@ -42,6 +42,7 @@ function publicConnections(properties) {
       clientId: properties['public.identity-client-id'],
       redirectUri: properties['public.identity-redirect-uri'],
       scopes: properties['public.identity-scopes'],
+      autoRefreshEnabled: properties['public.identity-auto-refresh-enabled'] === 'true',
     }),
   });
 }

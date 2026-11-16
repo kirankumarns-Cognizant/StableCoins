@@ -122,7 +122,13 @@ this transition; the text-styled **Refresh** control also requests a read, and
 does not restart preparation. Keep this payment open and diagnose event delivery,
 provider quotes and treasury observation before retrying preparation. The service
 normally waits up to the configured preparation timeout (default 120 seconds);
-the screenshot alone does not identify the failing dependency. On success inspect the
+the screenshot alone does not identify the failing dependency. The owner's
+subsequent database check confirms two READY quotes recorded at +2.84 seconds and
+one READY treasury observation at +3.21 seconds from the preparation record.
+This points toward recommendation processing rather than a missing evidence row;
+creation timestamps do not establish transaction commit time. Payment worker logs
+are the next diagnostic. Do not increase timeouts or manufacture a recommendation
+as a substitute for finding the cause. On success inspect the
 provider comparison, eligible/excluded paths, quote fees and evidence freshness.
 A pending state, no eligible route or an explicit error is an outcome to inspect;
 do not claim a usable recommendation before it appears. The button prepares
@@ -185,7 +191,14 @@ implemented permission grants.
    server-managed customer membership and permissions. A Cognito login alone does
    not grant customer access; browser-selected roles are not authoritative. The
    separate internal client and `stablecoins/internal` scope are for service calls,
-   not for human sign-in. Access tokens stay in browser memory.
+   not for human sign-in. Tokens stay in browser memory. The open tab renews its
+   access token automatically while Cognito permits when IDENTITY_AUTO_REFRESH_ENABLED
+   is true (default); there is no additional application idle timeout. A fresh
+   sign-in after this update is required to obtain its memory-only refresh token.
+   Reloading still requires sign-in and restores the same payment screen.
+   Provider revocation/refresh expiry still ends the session; payment deadlines,
+   quote expiry and approval validity continue to apply. Live renewal remains
+   an acceptance check, not a completed demo claim.
 5. **On Overview, verify the identity strip.** Expect actor
    `247824c8-3061-70d6-0d45-6955c0015bb6`, `PAYMENT_OPERATOR`, Customer A's ID,
    and policy `hackathon-a-v1`. Explain USD 50 maximum fee, permitted wallet/bank

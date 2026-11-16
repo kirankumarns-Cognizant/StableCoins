@@ -11,6 +11,7 @@ export interface PublicConnections {
     readonly clientId: string
     readonly redirectUri: string
     readonly scopes: string
+    readonly autoRefreshEnabled: boolean
   }
 }
 declare const __APP_CONNECTIONS__: PublicConnections

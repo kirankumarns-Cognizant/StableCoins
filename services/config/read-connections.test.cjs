@@ -127,3 +127,8 @@ test('browser identity endpoints are public while the development allowlist stay
  assert.equal(exposed.blockchain.explorerBaseUrl,'https://sepolia.basescan.org');
  assert.ok(!JSON.stringify(exposed).includes('private-codespace.test'));
 });
+
+test('browser token renewal is public and configurable, without exposing credentials',()=>{
+ assert.equal(publicConnections(readConnections({})).identity.autoRefreshEnabled,true);
+ assert.equal(publicConnections(readConnections({IDENTITY_AUTO_REFRESH_ENABLED:'false'})).identity.autoRefreshEnabled,false);
+});

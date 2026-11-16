@@ -4,6 +4,8 @@ import {useCallback,useEffect,useRef,useState} from 'react'
 import {connections} from './config/connections'
 import {ApiError,apiRoot,request} from './lib/api'
 import {finishLogin} from './lib/auth'
+import type {Session} from './lib/auth'
+import {SessionKeeper} from './lib/session'
 import {clearOperation,operation,parseRoute,paymentPath} from './lib/safety'
 import type {AgentRun,Catalog,Evidence,Journey,Payment,Recommendation} from './lib/model'
 import {Badge,Card} from './components/common'
@@ -12,17 +14,23 @@ import {PaymentViews} from './components/PaymentViews'
 import './App.css'
 
 export default function App(){
- const [session,setSession]=useState<{token:string;expiresAt:number}|null>(null)
+ const [session,setSession]=useState<Session|null>(null)
  const [catalog,setCatalog]=useState<Catalog|null>(null);const [payment,setPayment]=useState<Payment|null>(null)
  const [evidence,setEvidence]=useState<Evidence|null>(null);const [review,setReview]=useState<Recommendation|null>(null)
  const [agent,setAgent]=useState<AgentRun|null>(null);const [journey,setJourney]=useState<Journey|null>(null)
  const [hash,setHash]=useState(window.location.hash);const route=parseRoute(hash)
  const [error,setError]=useState('');const [commandError,setCommandError]=useState('');const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);const [updated,setUpdated]=useState('')
  const [refreshing,setRefreshing]=useState(false);const [refreshResult,setRefreshResult]=useState('')
+ const keeper=useRef<SessionKeeper|null>(null)
  const knownHash=useRef(window.location.hash)
  const epoch=useRef(0);const active=useRef<AbortController|null>(null);const callbackStarted=useRef(false)
  const base=apiRoot(connections.apiBaseUrl,location.origin)
- const reset=useCallback(()=>{epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setRefreshing(false);setRefreshResult('');setCommandError('');setNotice('')},[])
+ const reset=useCallback(()=>{keeper.current?.clear();epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setRefreshing(false);setRefreshResult('');setCommandError('');setNotice('')},[])
+ useEffect(()=>{
+  const instance=new SessionKeeper(connections.identity,value=>setSession(value),()=>{reset();setError('Session renewal ended. Sign in again to return to this screen; unresolved command keys are retained.')})
+  keeper.current=instance
+  return()=>{instance.clear();if(keeper.current===instance)keeper.current=null}
+ },[reset])
  useEffect(()=>{const handler=()=>{
   const before=parseRoute(knownHash.current),after=parseRoute(location.hash);knownHash.current=location.hash
   if(before.paymentId!==after.paymentId||before.review!==after.review){epoch.current++;active.current?.abort();setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setError('');setCommandError('');setBusy(false);setRefreshing(false);setRefreshResult('')}
@@ -34,14 +42,13 @@ export default function App(){
   if(!new URLSearchParams(query).has('code')&&!new URLSearchParams(query).has('error'))return
   callbackStarted.current=true;history.replaceState(null,'',location.pathname+location.hash)
   const generation=epoch.current
-  finishLogin(connections.identity,query,sessionStorage,location.origin).then(value=>{if(generation===epoch.current)setSession(value)}).catch(e=>{if(generation===epoch.current)setError(e.message)})
+  finishLogin(connections.identity,query,sessionStorage,location.origin).then(value=>{if(generation===epoch.current){keeper.current!.start(value);location.hash=value.returnHash}}).catch(e=>{if(generation===epoch.current)setError(e.message)})
  },[])
- useEffect(()=>{if(!session)return;const timer=setTimeout(()=>{reset();setError('Session expired. Sign in again; unresolved command keys have been retained.')},Math.max(0,session.expiresAt-Date.now()));return()=>clearTimeout(timer)},[session,reset])
  const load=useCallback(async()=>{
   // Polling must not cancel a slow read before its request timeout can complete.
   if(!session || active.current && !active.current.signal.aborted)return
   const controller=new AbortController();active.current=controller;const generation=epoch.current;setRefreshing(true)
-  const get=<T,>(path:string)=>request<T>(base,session.token,path,{signal:controller.signal})
+  const get=async<T,>(path:string)=>request<T>(base,await keeper.current!.validToken(),path,{signal:controller.signal})
   try{
    const c=await get<Catalog>('/payments/workbench');let p:Payment|null=null,e:Evidence|null=null,j:Journey|null=null,r:Recommendation|null=null,a:AgentRun|null=null
    if(route.paymentId){const path=paymentPath(route.paymentId);[p,e,j]=await Promise.all([get<Payment>(path),get<Evidence>(path+'/evidence'),get<Journey>(path+'/journey')]);const reviewId=route.review??e.recommendations[0]?.recommendation_id
@@ -65,7 +72,7 @@ export default function App(){
   if(!session||!catalog||busy)throw new Error('An authenticated, ready session is required')
   const generation=epoch.current;setBusy(true);setError('');setCommandError('');setNotice('')
   try{const op=name?operation(sessionStorage,catalog.customerId,name,body):null
-   const response=await request<Record<string,unknown>>(base,session.token,path,{method:'POST',body,key:op?.key})
+   const response=await request<Record<string,unknown>>(base,await keeper.current!.validToken(),path,{method:'POST',body,key:op?.key})
    if(op&&name)clearOperation(sessionStorage,catalog.customerId,name)
    if(generation===epoch.current){setNotice('Command acknowledged. Screens follow recorded server evidence.');if(path==='/payments'&&response.paymentId)go(`/payments/${encodeURIComponent(String(response.paymentId))}/routing`);else await load()}
    return response
@@ -82,7 +89,7 @@ export default function App(){
   <div className="truth-banner"><strong>Demonstration boundaries</strong><span>Funding, conversion, compliance, FX, Visa and bank credit are simulated. Blockchain is real only when recorded evidence says TESTNET / LIVE. Application ledger entries are separate accounting records.</span></div>
   {error&&<div role="alert" className="alert">{error}{session&&<button disabled={busy||refreshing} onClick={()=>void load()}>{refreshing?'Refreshing...':'Refresh evidence'}</button>}</div>}{commandError&&<div role="alert" className="alert">{commandError}</div>}{notice&&<p role="status" className="notice">{notice}</p>}
   {session&&<p role="status" aria-live="polite" className="muted">{refreshing?'Refreshing application evidence...':refreshResult}</p>}
-  {!session?<SignIn onSession={value=>{epoch.current++;setSession(value);setError('')}} onError={setError}/>:<>
+  {!session?<SignIn onSession={value=>{epoch.current++;keeper.current!.start(value);setError('')}} onError={setError}/>:<>
    <div className="session-strip"><span><strong>{catalog?.actorId??'Verifying identity...'}</strong> | {catalog?.roles.join(' + ')??'Server membership required'}</span><span>Customer {catalog?.customerId??'pending'} | Last successful refresh {time(updated)}</span><button className="quiet" disabled={busy||refreshing} onClick={()=>void load()}>{refreshing?'Refreshing...':'Refresh'}</button></div>
    {!catalog?<Card title="Connecting to the application"><p>The API must validate your token and server-managed membership. No demonstration data is substituted if it is unavailable.</p></Card>:route.page==='/payments/new'?<NewPayment key={catalog.customerId} catalog={catalog} enabled={enabled} onCreate={body=>command('/payments',body,'create')}/>:!route.paymentId?<Overview catalog={catalog}/>:payment&&evidence?<PaymentViews payment={payment} evidence={evidence} review={review} agent={agent} journey={journey} tab={route.tab} customerId={catalog.customerId} enabled={enabled} approver={catalog.roles.includes('PAYMENT_APPROVER')} act={act}/>:<Card title="Loading payment evidence"><p>Reading customer-authorized records. Commands remain unavailable until evidence loads.</p></Card>}
   </>}

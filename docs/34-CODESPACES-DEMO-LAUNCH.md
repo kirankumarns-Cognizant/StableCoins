@@ -56,8 +56,19 @@ The owner then requested recommendation preparation: the UI displayed PENDING,
 followed by REVIEW_REQUIRED with PREPARATION_TIMEOUT. Automatic refresh displayed
 the transition. Retain this payment and diagnose provider quotes, treasury evidence
 and event processing before retrying; the failing dependency is not yet established.
+The owner's database check shows both quotes READY at +2.84 seconds and treasury
+observation READY at +3.21 seconds; inspect payment-worker logs before retrying.
 Runtime agent execution and payment settlement remain to be demonstrated through
 the UI. See the runbook's complete navigation map for the remaining screen path.
+
+Open-tab session renewal is enabled by default through the shared
+`IDENTITY_AUTO_REFRESH_ENABLED=true` setting. It removes no server checks and
+adds no application idle limit; Cognito refresh validity/revocation still apply.
+After updating code and reloading the frontend, sign out and sign in securely once
+to obtain a new memory-only refresh token. Subsequent renewal should preserve the
+current payment tab. A full browser reload still requires sign-in; the PKCE flow
+restores the same payment path. Do not put tokens into configuration or storage.
+Live Cognito renewal still requires observation in Codespaces.
 The API fetch previously used `credentials: omit`, which drops the browser
 cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require

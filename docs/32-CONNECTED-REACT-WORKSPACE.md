@@ -88,6 +88,7 @@ Only its explicit `public.*` allowlist enters the browser build:
 | `IDENTITY_TOKEN_URI` | HTTPS token endpoint on the configured identity domain |
 | `IDENTITY_REDIRECT_URI` | Registered callback on the exact frontend origin, normally `/auth/callback` |
 | `IDENTITY_SCOPES` | Existing requested identity scopes |
+| `IDENTITY_AUTO_REFRESH_ENABLED` | Default true: renew an open-tab session in memory while the identity provider permits; false disables renewal |
 | `BLOCKCHAIN_EXPLORER_BASE_URL` | Existing configured HTTPS explorer base, exposed with configured testnet chain ID; no RPC settings enter the browser |
 | `PAYMENT_SERVICE_URL` | Vite development proxy target only; never exported to the browser |
 | `FRONTEND_DEV_ALLOWED_HOSTS` | Comma-separated exact Vite hosts for forwarded Codespaces URLs; server-only |
@@ -106,7 +107,27 @@ Cognito token exchange continues to omit cookies.
 Server JWT validation and membership remain the authorization boundary. A 401 or
 local signout clears all displayed customer data and cancels pending read requests.
 Local signout does not claim to revoke the identity provider's global SSO session.
-Refresh requires signing in again. No refresh token is persisted.
+The open tab now renews access tokens before expiry when
+`IDENTITY_AUTO_REFRESH_ENABLED=true` (shared default). Access and refresh tokens
+remain only in memory; rotated refresh tokens replace the prior value. Concurrent
+requests share one renewal, including after a suspended tab wakes. There is no
+additional application idle timeout or absolute demo duration. Cognito refresh-token
+validity, revocation and server authorization still apply; token expiry is never
+ignored. Set the shared flag false to disable renewal. A rejected renewal clears
+the session; transient failures retry only while the access token remains valid.
+No financial command is automatically replayed after an authorization failure.
+
+Reloading the page still requires sign-in because tokens are not persisted.
+PKCE state now retains only an allowlisted relative application hash (payment tab
+and optional review ID), and restores that screen after successful sign-in.
+The callback still revalidates customer membership before displaying records.
+Explicit signout cancels renewal and rejects late refresh results so a previous
+user cannot be restored. Provider global logout remains a separate pending item.
+
+AWS protocol reference: [Cognito refresh tokens](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-the-refresh-token.html).
+No live Cognito renewal has yet been captured in this rehearsal; a fresh login
+is required after pulling this update because older sessions discarded the
+refresh token. Passwords, token contents and financial deadlines are unchanged.
 
 For a rehearsal, expand **Rehearsal: use an existing access token** and paste an
 access token already accepted by the API. It is not decoded into a browser role
@@ -222,3 +243,14 @@ UI address and configuration order. [The proof package](35-HACKATHON-PROOF-PACKA
 adds two customer policies, baseline measurements, controlled simulated disruption
 and live-evidence gates. Step 11 preparation now precedes AWS application deployment.
 These additions do not claim completed Codespaces, model or testnet execution.
+
+### Session continuity verification - 2026-11-16
+
+Frontend unit checks: 23 passed, including nine session/PKCE refresh scenarios.
+Shared configuration checks: 16 passed. TypeScript/Vite build and lint passed.
+The first sandboxed headless browser could not initialize its GPU; an unrestricted
+run exposed a browser timer binding error during signout. That error was fixed
+and the final unrestricted browser regression passed all 23 checks, including
+two independent approvers, one execution request, refresh and authorization loss.
+All browser evidence is synthetic. These checks do not establish live Cognito
+renewal, a real runtime model call or public-testnet settlement.
