@@ -105,6 +105,16 @@ not delete or reset the database, seed balances, post journals or submit payment
 Use `docker compose --profile services ps` to inspect a failed startup; the local
 report links its Compose log. Image pulls/builds require network and disk space.
 
+After Compose and all 18 health/access probes pass, `start` prints
+`Server startup completed. All six backend services are healthy and access checks passed.`
+It then prints the application URL (port 5173) and backend `/health` URL (port
+8080). In Codespaces these use the current `CODESPACE_NAME` and
+`GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN`, rather than a hardcoded Codespace.
+Outside Codespaces they use localhost. React/Vite must be running separately on
+port 5173; the helper does not start the UI. Keep forwarded ports Private.
+A failed or blocked startup never prints these success messages or URLs.
+This reports backend readiness, not completed sign-in or payment acceptance.
+
 The 18 read-only probes require all six health routes to return 200 and each
 service to return 401 for both missing identity and a forged bearer token. They
 accept only HTTP loopback origins from the existing shared connections file or

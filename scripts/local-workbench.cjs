@@ -110,6 +110,18 @@ async function smoke(config=readConnections(), fetcher=fetch) {
   }
   return checks;
 }
+function startupMessages(report, environment=process.env) {
+  if(report.action!=='start' || report.status!=='PASSED') return [];
+  const name=environment.CODESPACE_NAME,domain=environment.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
+  const forwarded=typeof name==='string' && /^[a-z0-9-]+$/i.test(name) && typeof domain==='string' && /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(domain);
+  const origin=port=>forwarded?`https://${name}-${port}.${domain}`:`http://localhost:${port}`;
+  return [
+    'Server startup completed. All six backend services are healthy and access checks passed.',
+    `Application URL: ${origin(5173)}/`,
+    `Backend health URL: ${origin(8080)}/health`,
+    'The React frontend must be running separately on port 5173 before opening the application. Keep Codespaces ports Private.',
+  ];
+}
 async function main(args=process.argv.slice(2)) {
   const action=args[0] || 'doctor';
   if(!['doctor','verify','start','smoke'].includes(action) || action!=='verify' && args.length>1 || args.slice(1).some(arg=>!['--offline','--require-database'].includes(arg))) throw Error('Usage: node scripts/local-workbench.cjs doctor|verify|start|smoke [--offline] [--require-database]');
@@ -173,7 +185,8 @@ async function main(args=process.argv.slice(2)) {
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
+  for(const message of startupMessages(report))console.log(message);
   return report;
 }
-module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,main};
+module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,main};
 if(require.main===module)main().catch(()=>{console.error('Local validation could not start');process.exitCode=2;});

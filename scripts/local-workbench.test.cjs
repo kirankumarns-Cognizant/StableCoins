@@ -1,7 +1,25 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {command,parseSuites,localUrl,probe,doctor,smoke,databaseGate,verificationEnvironment,main}=require('./local-workbench.cjs');
+const {command,parseSuites,localUrl,probe,doctor,smoke,databaseGate,verificationEnvironment,startupMessages,main}=require('./local-workbench.cjs');
 const {readConnections}=require('../services/config/read-connections.cjs');
+
+test('successful startup prints current Codespaces frontend and backend health URLs without claiming the UI was started',()=>{
+  const messages=startupMessages({action:'start',status:'PASSED'},{CODESPACE_NAME:'demo-space-123',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'});
+  assert.ok(messages.includes('Application URL: https://demo-space-123-5173.app.github.dev/'));
+  assert.ok(messages.includes('Backend health URL: https://demo-space-123-8080.app.github.dev/health'));
+  assert.match(messages.join('\n'),/frontend must be running separately/);
+});
+test('startup URLs use loopback outside Codespaces and never render malformed forwarding variables',()=>{
+  for(const environment of [{},{CODESPACE_NAME:'demo',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'https://user:secret@external.test'},{CODESPACE_NAME:'demo\nforged message',GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:'app.github.dev'}]) {
+    const messages=startupMessages({action:'start',status:'PASSED'},environment).join('\n');
+    assert.match(messages,/Application URL: http:\/\/localhost:5173\//);
+    assert.match(messages,/Backend health URL: http:\/\/localhost:8080\/health/);
+    assert.ok(!messages.includes('secret') && !messages.includes('forged'));
+  }
+});
+test('failed, blocked and unrelated actions never announce successful startup or application URLs',()=>{
+  for(const report of [{action:'start',status:'FAILED'},{action:'start',status:'BLOCKED'},{action:'start',status:'RUNNING'},{action:'smoke',status:'PASSED'},{action:'verify',status:'PASSED'}]) assert.deepEqual(startupMessages(report,{}),[]);
+});
 
 test('Windows wrapper quotes paths with spaces and rejects shell expansion',async()=>{
   await assert.rejects(main(['start','--offline']),/Usage/);
