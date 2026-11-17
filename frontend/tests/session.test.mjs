@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {beginLogin,finishLogin,refreshSession,returnRoute} from '../src/lib/auth.ts'
+import {beginLogin,cognitoLogoutUrl,finishLogin,refreshSession,returnRoute} from '../src/lib/auth.ts'
 import {SessionKeeper} from '../src/lib/session.ts'
 const identity={clientId:'public-client',redirectUri:'https://ui.test/auth/callback',authorizationUri:'https://id.test/oauth2/authorize',tokenUri:'https://id.test/oauth2/token',scopes:'openid profile',autoRefreshEnabled:true}
 class Storage {values=new Map();getItem(k){return this.values.get(k)??null}setItem(k,v){this.values.set(k,v)}removeItem(k){this.values.delete(k)}}
@@ -52,4 +52,21 @@ test('transient failure retries only while access is valid, then ends session',a
 })
 test('disabled renewal and pasted access tokens retain provider expiry; no fake unlimited token',async()=>{
  for(const [enabled,refreshToken] of [[false,'refresh'],[true,undefined]]){let calls=0;const h=harness(async()=>{calls++;throw Error('must not refresh')},enabled);h.keeper.start({token:'manual',expiresAt:11000,refreshToken});h.setTime(11000);await h.fire();assert.equal(calls,0);assert.equal(h.expired,1);await assert.rejects(h.keeper.validToken())}
+})
+
+const cognito={...identity,authorizationUri:'https://demo.auth.us-west-2.amazoncognito.com/oauth2/authorize',tokenUri:'https://demo.auth.us-west-2.amazoncognito.com/oauth2/token'}
+test('Cognito sign-out clears hosted UI session through the configured domain and registered root',()=>{
+ const url=new URL(cognitoLogoutUrl(cognito,'https://ui.test'))
+ assert.equal(url.origin,'https://demo.auth.us-west-2.amazoncognito.com');assert.equal(url.pathname,'/logout')
+ assert.deepEqual([...url.searchParams],[['client_id','public-client'],['logout_uri','https://ui.test/']])
+ assert.equal(url.hash,'');assert.equal(url.searchParams.has('token'),false)
+})
+test('hosted sign-out refuses unsafe or mismatched identity configuration',()=>{
+ for(const authorizationUri of ['http://demo.auth.us-west-2.amazoncognito.com/oauth2/authorize','https://user:secret@demo.auth.us-west-2.amazoncognito.com/oauth2/authorize','https://demo.auth.us-west-2.amazoncognito.com/oauth2/authorize?logout_uri=https://elsewhere.test'])assert.throws(()=>cognitoLogoutUrl({...cognito,authorizationUri},'https://ui.test'))
+ assert.throws(()=>cognitoLogoutUrl({...cognito,redirectUri:'https://elsewhere.test/auth/callback'},'https://ui.test'))
+})
+test('non-Cognito providers and lookalike domains do not receive a guessed sign-out request',()=>{
+ assert.equal(cognitoLogoutUrl(identity,'https://ui.test'),null)
+ for(const authorizationUri of ['https://demo.auth.us-west-2.amazoncognito.com.attacker.test/oauth2/authorize','https://demo.auth.us-west-2.amazoncognito.com/login'])assert.equal(cognitoLogoutUrl({...cognito,authorizationUri},'https://ui.test'),null)
+ assert.equal(cognitoLogoutUrl({...cognito,tokenUri:identity.tokenUri},'https://ui.test'),null)
 })

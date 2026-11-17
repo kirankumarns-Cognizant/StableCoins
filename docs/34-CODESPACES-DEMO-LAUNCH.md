@@ -647,3 +647,31 @@ a payment, or change MOCK readiness into public-testnet evidence.
 
 Local validation: frontend TypeScript/Vite build and lint passed; all 23 existing
 frontend tests passed. Updated rendering still requires confirmation in Codespaces.
+
+
+### Switching Cognito demo users - 2026-11-17
+
+The previous Sign out / switch user action cleared only the application's in-memory
+session. Cognito's hosted UI browser cookie could immediately sign in the same
+operator again. The action now clears local state/renewal first, then navigates to
+the configured standard Cognito domain's /logout endpoint, with the browser client
+ID and the application root as logout_uri. The application root must remain in
+the client's Allowed sign-out URLs (it was registered for the Oregon demo client).
+The next Sign in securely action should show the Cognito sign-in form.
+
+For the approval rehearsal: sign out, sign in as demo-a-approver-one, open the
+existing payment from Overview, then Quote & approvals. Verify PAYMENT_APPROVER,
+review version and expiry before accepting/approving. Repeat with
+demo-a-approver-two for the second independent approval. Sign-out returns to the
+application root; reopen the existing payment instead of creating a replacement.
+Do not refresh the recommendation between approvals unless its evidence expired.
+
+This change supports the configured standard Cognito hosted domains. Other IdPs
+and custom domains retain local sign-out with an explicit notice; their logout
+endpoints must not be guessed. Hosted UI logout clears its browser session; it
+does not claim global token revocation or logout from external federated IdPs.
+No roles, approval requirements, payment records or financial controls change.
+
+Local validation: frontend TypeScript/Vite build and lint passed; all 26 frontend
+tests passed, including logout URL safety and renewal cancellation. Real hosted
+Cognito user switching must still be verified in the Codespaces browser.

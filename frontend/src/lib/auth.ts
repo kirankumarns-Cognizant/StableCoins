@@ -32,3 +32,14 @@ export async function refreshSession(config:Identity,session:Session,signal?:Abo
  if(!response.ok)throw new Error(response.status===400||response.status===401?'SESSION_RENEWAL_REJECTED':'SESSION_RENEWAL_UNAVAILABLE')
  return tokenSession(await response.json(),session.refreshToken)
 }
+
+// Cognito hosted UI cookies survive an application-only sign-out.
+// Use only the configured standard Cognito domain; other IdPs retain local sign-out.
+export function cognitoLogoutUrl(config:Identity,origin:string):string|null{
+ validateIdentity(config,origin)
+ const authorization=endpoint(config.authorizationUri),token=endpoint(config.tokenUri)
+ if(!/^[a-z0-9-]+\.auth\.[a-z0-9-]+\.amazoncognito\.com$/.test(authorization.hostname)||authorization.pathname!=='/oauth2/authorize'||token.origin!==authorization.origin||token.pathname!=='/oauth2/token')return null
+ const url=new URL('/logout',authorization)
+ url.search=new URLSearchParams({client_id:config.clientId,logout_uri:new URL('/',origin).href}).toString()
+ return url.href
+}
