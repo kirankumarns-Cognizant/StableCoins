@@ -432,3 +432,17 @@ and application startup are unchanged. After pulling the fix, rerun strict
 verification and share its newest result before starting a fresh payment intent.
 An optional skipped live-model case does not explain those four failures or
 establish a live model run.
+
+### Display failures directly in the terminal
+
+Use `start --show-failures` to start React, the six backend services and local
+PostgreSQL/LocalStack, with failure summaries and bounded redacted excerpts when
+startup fails. Use `verify --require-database --show-failures` for build/test
+verification with the same diagnostic option. Prefix each command with
+`node --env-file=.env scripts/local-workbench.cjs`. Run them separately.
+
+Verification does not start the interactive application. It uses test-owned
+settings and isolated database integration containers; start the application with
+`start` after verification. Both commands retain percentage/heartbeat reporting.
+Only successful startup prints usable application URLs. See
+[CLI responsibilities and diagnostic limits](33-LOCAL-FIRST-VALIDATION.md#cli-failure-details-and-command-responsibilities-2026-11-17).

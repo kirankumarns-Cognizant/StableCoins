@@ -89,3 +89,11 @@ test('verification heartbeat reports current percentage and cleans up on thrown 
   await new Promise(resolve=>setTimeout(resolve,15));
   assert.equal(lines.length,count);
 });
+
+
+test('verification failures name failed stages, suite counts and unsatisfied database gates',()=>{
+ const lines=failureMessages({action:'verify',status:'FAILED',checks:[{name:'java',status:'FAILED',exitCode:1,log:'/local/java.log'}],java:{suites:[{name:'ConnectionConfigurationTest',failures:4,errors:0},{name:'PassedTest',failures:0,errors:0}]},databaseGate:'NOT_SATISFIED',reason:'java failed'}).join('\n');
+ assert.match(lines,/Verification status: FAILED/);assert.match(lines,/Failed component: java/);
+ assert.match(lines,/ConnectionConfigurationTest.*Failures: 4/);assert.match(lines,/Database gate: NOT_SATISFIED/);
+ assert.ok(!lines.includes('PassedTest'));assert.ok(!lines.includes('Application readiness'));
+});

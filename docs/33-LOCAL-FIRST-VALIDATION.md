@@ -380,3 +380,60 @@ missing JDK confirmed both commands report prerequisite failure, retain pending
 checks and print no application success URL. These are local regression results;
 the full Codespaces Java/database reactor and live payment demonstration remain
 pending. No application configuration values were changed by this fix.
+
+## CLI failure details and command responsibilities (2026-11-17)
+
+`start` initializes/reuses all three application layers: React frontend, six Java
+backend services, and PostgreSQL with LocalStack messaging. It then checks container
+health, API access boundaries and the frontend proxy before announcing readiness.
+`verify` builds and tests these layers, including CDK checks. Its Java integration
+tests use isolated test database containers; it does not start the interactive
+application or substitute for `start`. Neither command deploys to AWS.
+
+Failure summaries now appear directly in the CLI for both commands, including
+failed prerequisites, checks, available reasons/exit codes, failed Java suite
+counts, diagnostic paths and an unsatisfied database gate when applicable.
+To add short, redacted diagnostic excerpts, use the optional flag:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+```
+
+For verification, run this separately:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs verify --require-database --show-failures
+```
+
+Read the explicit final result together with the progress percentage. The flag
+adds diagnostics after failure; it does not change checks, exit codes, approval
+requirements, configuration isolation, data volumes or financial execution.
+Successful commands do not dump logs. Without the flag, a failure prints the
+summary and a reminder that `--show-failures` is available.
+
+On failure, excerpts come from failed-stage logs and fresh failed Surefire/Failsafe
+text reports. Startup also makes one bounded, read-only Compose log request for
+allowlisted failed containers, including failed PostgreSQL/LocalStack dependencies.
+It never dumps container environments or restarts a component to gather diagnostics.
+An unavailable log request leaves the original failure result intact.
+
+Output is limited to six diagnostic sources and 20 selected lines per source;
+only the last 64 KiB of each file is read and displayed lines are shortened.
+Configured secret values, credential fields, authorization material, key-like
+values, email addresses, URL paths/query strings and terminal control sequences
+are redacted. Full local diagnostic files remain available for detailed inspection;
+do not share unreviewed raw logs. Fresh report timestamps and bounded path checks
+prevent reading unrelated or stale files as current test failures.
+
+The UI demonstration continues to follow the
+[presenter navigation](29-PROTOTYPE-EXECUTION-RUNBOOK.md#numbered-presenter-navigation-url-login-roles-actions-and-outcomes)
+after successful startup and the separate required acceptance gates.
+
+Validation of the CLI diagnostic option: 91 Node unit checks passed, with no
+failures or skips. They cover option parsing, failure summaries, assertion excerpts,
+credential/control-character redaction, stale/outside file rejection, output bounds
+and read-only failed-service selection. Actual CLI invocations of both commands
+with an intentionally missing JDK displayed the failure summary/details, retained
+exit code 2 and emitted no success URL. Container log collection was exercised
+with a controlled command stub; real Codespaces diagnostics and the full database
+acceptance run remain pending. No Java/application runtime logic changed.

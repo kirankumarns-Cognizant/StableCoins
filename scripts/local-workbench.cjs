@@ -6,6 +6,7 @@ const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
 const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker} = require('./startup-status.cjs');
+const {redact,collectServiceDiagnostics,failureDetails}=require('./failure-diagnostics.cjs');
 const root = resolve(__dirname, '..');
 const modules = ['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'];
 const services = ['payment','compliance-quote','blockchain','ledger','reconciliation','visa'];
@@ -144,9 +145,14 @@ function startupMessages(report, environment=process.env, config) {
     'Keep Codespaces ports Private. Sign-in and full payment acceptance are separate checks.',
   ];
 }
+function validationArguments(args) {
+  const action=args[0] || 'doctor',options=args.slice(1);
+  const allowed={doctor:[],smoke:[],start:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
+  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|start [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
+  return {action,showFailures:options.includes('--show-failures')};
+}
 async function main(args=process.argv.slice(2)) {
-  const action=args[0] || 'doctor';
-  if(!['doctor','verify','start','smoke'].includes(action) || action!=='verify' && args.length>1 || args.slice(1).some(arg=>!['--offline','--require-database'].includes(arg))) throw Error('Usage: node scripts/local-workbench.cjs doctor|verify|start|smoke [--offline] [--require-database]');
+  const {action,showFailures}=validationArguments(args);
   const directory=join(root,'.local','validation',`${Date.now()}-${process.pid}-${action}`);
   mkdirSync(directory,{recursive:true});
   const file=join(directory,'report.json');
@@ -256,12 +262,18 @@ async function main(args=process.argv.slice(2)) {
   } catch(error) {report.status='FAILED';report.reason=error.message;if(verification)verification.update(activeVerification,'FAILED');}
   if(tracker){report.components=tracker.snapshot();console.log(tracker.summary());}
   if(verification)console.log(verification.summary());
+  if(showFailures && report.status==='FAILED'){
+    console.log('Collecting CLI failure diagnostics...');
+    report.diagnostics=await collectServiceDiagnostics(report,directory,run);
+  }
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
-  for(const message of failureMessages(report))console.error(message);
+  for(const message of failureMessages(report))console.error(redact(message));
+  if(showFailures)for(const message of failureDetails(report,{root,directory}))console.error(message);
+  if(report.status==='FAILED' && !showFailures && ['start','verify'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
   for(const message of startupMessages(report))console.log(message);
   return report;
 }
-module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,main};
+module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,validationArguments,main};
 if(require.main===module)main().catch(()=>{console.error('Local validation could not start');process.exitCode=2;});

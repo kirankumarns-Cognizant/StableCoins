@@ -110,3 +110,12 @@ test('verification isolates deployed connections while retaining Java and Docker
   assert.deepEqual(parent,original);
   assert.equal(safe.RUN_REAL_MODEL_TESTS,'false');
 });
+
+
+test('failure diagnostics flag is accepted for startup and verification without changing their actions',()=>{
+  const {validationArguments}=require('./local-workbench.cjs');
+  assert.deepEqual(validationArguments(['start','--show-failures']),{action:'start',showFailures:true});
+  assert.deepEqual(validationArguments(['verify','--require-database','--show-failures']),{action:'verify',showFailures:true});
+  assert.deepEqual(validationArguments(['verify']),{action:'verify',showFailures:false});
+  for(const args of [['doctor','--show-failures'],['smoke','--show-failures'],['start','--require-database'],['verify','--unknown']])assert.throws(()=>validationArguments(args),/Usage/);
+});

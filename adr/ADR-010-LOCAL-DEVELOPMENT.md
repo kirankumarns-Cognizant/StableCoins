@@ -119,3 +119,13 @@ Java/Docker tooling configuration remains available. Application configuration a
 accepted deployment architecture are unchanged. Final evidence/database gates and
 public-testnet opt-in remain authoritative. See the local validation guide for
 percentage semantics, the configuration regression and execution boundaries.
+
+## Opt-in CLI failure diagnostics note (2026-11-17)
+
+The existing workbench accepts `--show-failures` for startup and verification.
+Both commands report failure summaries; the option adds bounded redacted excerpts
+and read-only logs from allowlisted failed local containers. Diagnostics preserve
+failure exit codes and test/database gates, and do not restart components or
+change the accepted architecture. Startup initializes the interactive local
+layers; verification builds/tests them using test-owned configuration and isolated
+integration databases. See the local validation guide for scope and limits.
