@@ -437,3 +437,42 @@ with an intentionally missing JDK displayed the failure summary/details, retaine
 exit code 2 and emitted no success URL. Container log collection was exercised
 with a controlled command stub; real Codespaces diagnostics and the full database
 acceptance run remain pending. No Java/application runtime logic changed.
+
+## Sequential component startup (2026-11-17)
+
+The unified `start --show-failures` command now starts one Compose target at a
+ time: PostgreSQL, LocalStack, payment-service, compliance-quote-service,
+blockchain-service, settlement-ledger-service, reconciliation-service,
+visa-simulator, then React after the backend API/access checks. Each target must
+pass its Compose health check before the next starts. Backend images are built
+one at a time with existing Dockerfiles; `--no-deps` prevents Compose from
+implicitly starting additional targets. Infrastructure is explicitly started first.
+This reduces concurrent compiler pressure; total startup time is not guaranteed
+to decrease, and existing running services continue to consume resources.
+
+The entry command is unchanged:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+```
+
+The active component has a STARTING message and 15-second heartbeat. Completion
+updates the nine-component percentage; a long image build does not imply a
+percentage increase. Failed build/start commands stop the sequence, identify the
+failed target and leave later targets pending. Existing containers and volumes
+are retained. A still-healthy old image cannot turn a failed rebuild into success.
+Final API, access-boundary, React and proxy checks remain required before URLs
+are announced. The shared `compose.log` and report contain per-target outcomes;
+`--show-failures` retains bounded redacted diagnostics. No manual component
+commands, AWS deployment, payment submission or configuration changes are added.
+
+Validation: 34 relevant Node tests passed, including sequential execution,
+infrastructure ordering, health-wait flags, failure/timeout/exception handling,
+progress and failure diagnostics. Docker execution used controlled command stubs;
+the sequential Docker startup must still be exercised in Codespaces.
+
+Separately, the owner's Codespaces verification run
+`1794894736276-45358-verify` completed all eight stages: 614 Java tests,
+613 passed, zero failures/errors, and only RoutingAgentLiveTest skipped. The
+required database evidence gate passed. This is code/database verification;
+live application AI inference and public-testnet payment acceptance remain open.

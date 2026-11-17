@@ -446,3 +446,20 @@ settings and isolated database integration containers; start the application wit
 `start` after verification. Both commands retain percentage/heartbeat reporting.
 Only successful startup prints usable application URLs. See
 [CLI responsibilities and diagnostic limits](33-LOCAL-FIRST-VALIDATION.md#cli-failure-details-and-command-responsibilities-2026-11-17).
+
+### Single-command sequential startup (2026-11-17)
+
+After pulling the update, use the same `start --show-failures` command. It starts
+PostgreSQL, LocalStack, payment, compliance/quote, blockchain, ledger,
+reconciliation and Visa simulator one by one, waiting for each health check.
+React starts after backend API/access checks. Each backend image is built in
+sequence using the existing Dockerfile. A failure stops subsequent starts,
+retains existing data and reports the failed component and diagnostic log.
+There is no need to run individual Docker or Vite startup commands.
+
+The owner's strict verification run `1794894736276-45358-verify` passed with
+613 Java tests passed and one optional live-agent test skipped. Sequential startup
+has passed 34 relevant Node checks locally; actual sequential Docker startup
+remains to be checked here. Once startup succeeds, follow the numbered presenter
+navigation with a new payment and future deadline; do not reuse the expired
+PAY-52272AAC4E14 preparation for execution. Live AI/testnet acceptance is separate.

@@ -129,3 +129,13 @@ failure exit codes and test/database gates, and do not restart components or
 change the accepted architecture. Startup initializes the interactive local
 layers; verification builds/tests them using test-owned configuration and isolated
 integration databases. See the local validation guide for scope and limits.
+
+## Sequential local startup note (2026-11-17)
+
+The existing workbench now starts local Compose targets sequentially, waiting for
+each target's health check before proceeding: PostgreSQL, LocalStack and then the
+six existing backend services. React follows the backend API/access checks.
+Existing Dockerfiles, health checks, configuration and volumes remain authoritative.
+Failure stops further starts and retains diagnostic/progress reporting. This
+implements local resource scheduling within ADR-010; it adds no service and does
+not change AWS deployment architecture or financial execution controls.

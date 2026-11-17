@@ -1029,3 +1029,15 @@ manually mark it READY. For the next UI rehearsal after updating/restarting:
 
 The captured observation is MOCK and uses the default mock treasury address. It
 does not establish balances or funding of the separately generated real wallets.
+
+### Presenter startup prerequisite update (2026-11-17)
+
+Run `node --env-file=.env scripts/local-workbench.cjs start --show-failures` once.
+It starts PostgreSQL, LocalStack and each of the six backend services sequentially,
+then checks backend APIs and starts React. Wait for the final successful startup
+message and Application URL before beginning the numbered UI navigation. Each
+component has status/percentage output; a failure stops the sequence and prints
+diagnostics. Do not run a second startup while the first remains active.
+The strict Codespaces code/database verification passed (613 Java tests passed,
+one optional live-model test skipped); this does not establish live AI or testnet
+settlement acceptance. After startup, create a fresh payment with a future deadline.

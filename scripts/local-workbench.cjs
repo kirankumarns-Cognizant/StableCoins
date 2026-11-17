@@ -5,6 +5,7 @@ const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, writeSync,
 const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
+const {startBackends} = require('./sequential-startup.cjs');
 const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker} = require('./startup-status.cjs');
 const {redact,collectServiceDiagnostics,failureDetails}=require('./failure-diagnostics.cjs');
 const root = resolve(__dirname, '..');
@@ -220,13 +221,21 @@ async function main(args=process.argv.slice(2)) {
       const logPath=join(directory,'compose.log'),log=openSync(logPath,'w');
       console.log(`Backend build/start log: ${logPath}`);
       console.log(tracker.summary());
-      let result;try{result=await startupStage('backend containers: build, start and health checks',()=>run('docker',['compose','--profile','services','up','-d','--build','--wait','--wait-timeout',String(waitSeconds)],{log,onOutput:tracker.output,timeoutMs:1800000}),stageOptions);}finally{closeSync(log);}
+      console.log('Startup order: PostgreSQL > LocalStack > payment > compliance/quote > blockchain > ledger > reconciliation > Visa simulator > React');
+      let result;try{result=await startBackends({execute:run,tracker,waitSeconds,log,stageOptions,onCheck:check=>{
+        report.checks.push({...check,log:logPath});save();
+      }});}finally{closeSync(log);}
       report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,reason:result.timedOut?'COMMAND_TIMEOUT':result.code===0?undefined:'BUILD_OR_CONTAINER_READINESS_FAILED',log:logPath});save();
       const inventory=await run('docker',['compose','--profile','services','ps','--all','--format','json'],{timeoutMs:10000});
       try {
         if(inventory.code!==0)throw Error('Container status unavailable');
-        report.containers=containerChecks(inventory.output);
-        for(const check of report.containers)tracker.update(check.name,check.status==='PASSED'?'STARTED':'FAILED',check.reason+(check.exitCode!==undefined?' (exit '+check.exitCode+')':''));
+        const attempted=new Set(report.checks.filter(check=>check.name.startsWith('compose:')).map(check=>check.name.slice('compose:'.length)));
+        report.containers=containerChecks(inventory.output).filter(check=>attempted.has(check.name));
+        for(const check of report.containers) {
+          // A still-running old image cannot erase a failed build/start attempt.
+          if(check.status==='PASSED' && tracker.snapshot().some(item=>item.name===check.name && item.status==='FAILED'))continue;
+          tracker.update(check.name,check.status==='PASSED'?'STARTED':'FAILED',check.reason+(check.exitCode!==undefined?' (exit '+check.exitCode+')':''));
+        }
       }catch {report.containerDiagnostics='UNAVAILABLE';}
       save();
       if(result.code!==0)throw Error('Compose startup failed; inspect the local log. Existing volumes were retained');
