@@ -70,7 +70,7 @@ current payment tab. A full browser reload still requires sign-in; the PKCE flow
 restores the same payment path. Do not put tokens into configuration or storage.
 Live Cognito renewal still requires observation in Codespaces.
 The API fetch previously used `credentials: omit`, which drops the browser
-cookie needed by private Codespaces forwarding. The owner patched the Codespaces checkout to use `same-origin`:
+cookie needed by private Codespaces forwarding. The same-origin cookie fix is now included in the repository, replacing the earlier manual Codespaces patch:
 keep port 5173 private, use `/api/v1` on the UI origin, and continue to require
 the Cognito bearer token. Cross-origin cookie forwarding stays disabled and
 redirects remain rejected. The owner also enabled `PAYMENT_FLOW_ENABLED=true`;
@@ -491,3 +491,37 @@ does not establish a local copy. Enter key material only through a hidden privat
 setup flow; never place it in this document, Git or terminal command arguments.
 The change does not enable the agent or create a key. Keep the currently running
 application available until applying the update; no AWS deployment is involved.
+
+
+## Source synchronization: local ? GitHub ? Codespaces
+
+Implement and validate source changes locally, publish them to GitHub, then update
+the Codespace from `main`. A change made only in a Codespace does not exist in
+GitHub until it is committed and pushed. Private `.env`, `.local/` configuration,
+wallet files and credentials remain outside Git.
+
+Before updating a Codespace, inspect its changes:
+
+```bash
+git status --short --untracked-files=normal
+```
+
+If the checkout is clean, pull the published source:
+
+```bash
+git pull --ff-only origin main
+```
+
+If tracked files have local edits, stop before pulling and review their diff.
+Preserve intended edits in a named stash or a separate branch, reconcile them with
+the published implementation, and test the result before publishing any additional
+changes. Keep the saved edits until the reconciliation is confirmed; do not discard
+or blindly reapply an older manual patch. In particular, earlier Codespace edits to
+`frontend/src/lib/api.ts` and `frontend/tests/safety.test.mjs` may duplicate the
+now-published same-origin cookie fix.
+
+After pulling, compare `git rev-parse HEAD` with `git ls-remote origin refs/heads/main`
+and check `git status --short --untracked-files=normal` again. Matching commit IDs
+and a clean tracked checkout establish source synchronization at that point.
+Ignored private settings deliberately differ between environments. Restart the
+application separately to load changed code or configuration.

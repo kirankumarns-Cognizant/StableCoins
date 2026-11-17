@@ -8,7 +8,8 @@ export async function request<T>(base:string,token:string,path:string,options:{m
  if(!token||/[\r\n]/.test(token))throw new ApiError(401,'ACCESS_TOKEN_REQUIRED')
  if(!path.startsWith('/')||path.startsWith('//')||path.includes('..'))throw new Error('Invalid API path')
  const timeout=AbortSignal.timeout(20000);const signal=options.signal?AbortSignal.any([timeout,options.signal]):timeout
- const response=await fetch(base+path,{method:options.method??'GET',signal,redirect:'error',credentials:'omit',cache:'no-store',headers:{Authorization:`Bearer ${token}`,Accept:'application/json',...(options.body!==undefined?{'Content-Type':'application/json'}:{}),...(options.key?{'Idempotency-Key':options.key}:{})},...(options.body!==undefined?{body:JSON.stringify(options.body)}:{})})
+ // Private Codespaces forwarding needs its same-origin session cookie; API authorization still requires the bearer token.
+ const response=await fetch(base+path,{method:options.method??'GET',signal,redirect:'error',credentials:'same-origin',cache:'no-store',headers:{Authorization:`Bearer ${token}`,Accept:'application/json',...(options.body!==undefined?{'Content-Type':'application/json'}:{}),...(options.key?{'Idempotency-Key':options.key}:{})},...(options.body!==undefined?{body:JSON.stringify(options.body)}:{})})
  const text=await response.text();let body:unknown
  try{body=text?JSON.parse(text):null}catch{throw new ApiError(response.status,'INVALID_API_RESPONSE')}
  if(!response.ok){const error=body as {code?:string;errorCode?:string};throw new ApiError(response.status,error?.code??error?.errorCode??`HTTP_${response.status}`)}
