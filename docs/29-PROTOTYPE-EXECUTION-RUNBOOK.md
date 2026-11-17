@@ -1041,3 +1041,14 @@ diagnostics. Do not run a second startup while the first remains active.
 The strict Codespaces code/database verification passed (613 Java tests passed,
 one optional live-model test skipped); this does not establish live AI or testnet
 settlement acceptance. After startup, create a fresh payment with a future deadline.
+
+
+## Oregon presenter prerequisite (2026-11-17)
+
+The target region is now us-west-2. Before repeating the UI walkthrough, complete
+the [Oregon configuration cutover](34-CODESPACES-DEMO-LAUNCH.md#oregon-migration-and-cutover-2026-11-17),
+restart, sign out and sign in with the new Oregon demo users. Usernames, customer
+IDs, roles, UI URL and navigation are unchanged; Cognito subject/client/pool IDs
+are new. Password setup succeeded for all six users, but application login after
+cutover and real model/testnet execution remain unverified. Select a new payment
+with a future deadline and fresh evidence; retain old payments as history.

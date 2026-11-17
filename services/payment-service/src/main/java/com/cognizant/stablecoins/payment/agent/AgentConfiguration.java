@@ -10,7 +10,7 @@ import java.time.Duration;
 import java.net.URI;
 @Configuration
 public class AgentConfiguration {
-    @Bean AgentKeyProvider agentKeys(AgentProviderProperties p,@Value("${connections.aws.region:us-east-1}")String region,
+    @Bean AgentKeyProvider agentKeys(AgentProviderProperties p,@Value("${connections.aws.region:us-west-2}")String region,
             @Value("${connections.aws.endpoint:}")String endpoint,@Value("${connections.aws.local-access-key:test}")String access,
             @Value("${connections.aws.local-secret-key:test}")String secret){
         return new SecretsManagerAgentKeyProvider(()->{

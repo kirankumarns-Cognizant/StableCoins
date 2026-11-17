@@ -7,7 +7,7 @@ public class AgentProviderProperties {
     public enum Provider { OPENAI, BEDROCK }
     public enum AuthMode { SECRET_BEARER, AWS_SIGV4 }
     private Provider provider=Provider.OPENAI;private AuthMode authMode=AuthMode.SECRET_BEARER;
-    private String region="us-east-1";
+    private String region="us-west-2";
     public Provider getProvider(){return provider;}public void setProvider(Provider v){provider=v;}
     public AuthMode getAuthMode(){return authMode;}public void setAuthMode(AuthMode v){authMode=v;}
     public String getRegion(){return region;}public void setRegion(String v){region=v;}

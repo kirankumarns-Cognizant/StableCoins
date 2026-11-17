@@ -150,3 +150,15 @@ for local key retrieval. This is an emulated secret store, separate from real
 AWS Secrets Manager and its KMS controls. It does not create/import an API key,
 enable the agent, or change AWS deployment architecture. Private values remain
 excluded from Git.
+
+
+## Oregon target-region note (2026-11-17)
+
+The owner selected us-west-2 for the POC target. Shared/Compose/Java defaults now
+match that region, with explicit overrides retained. A demo-specific migration
+helper validates and backs up private files before updating Cognito metadata and
+known customer subjects. LocalStack messaging remains emulated; regional defaults
+do not establish AWS authentication or real secret retrieval in Codespaces.
+No deployment topology, financial control, secret-provider architecture or
+immutable accounting/payment record is changed. See the Codespaces runbook for
+observed provisioning, safe cutover, and remaining credential/live gates.

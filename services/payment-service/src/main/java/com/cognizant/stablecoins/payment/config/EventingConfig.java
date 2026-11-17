@@ -39,7 +39,7 @@ public class EventingConfig {
     @Value("${connections.aws.account-id:000000000000}")
     private String localstackAccountId;
 
-    @Value("${connections.aws.region:us-east-1}")
+    @Value("${connections.aws.region:us-west-2}")
     private String region;
 
     @Value("${connections.aws.local-access-key:test}")

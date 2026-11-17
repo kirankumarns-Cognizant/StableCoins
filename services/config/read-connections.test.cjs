@@ -8,6 +8,11 @@ test('shared defaults and nested DB placeholders resolve', () => {
   assert.equal(config['app.eventbridge.bus-name'], 'stablecoin-payment-bus');
   assert.equal(config['blockchain.mode'], 'MOCK');
   assert.equal(config['testnet.enabled'], 'false');
+  assert.equal(config['connections.aws.region'], 'us-west-2');
+  assert.equal(config['connections.ai.region'], 'us-west-2');
+  const override = readConnections({AWS_REGION: 'us-east-2'});
+  assert.equal(override['connections.aws.region'], 'us-east-2');
+  assert.equal(override['connections.ai.region'], 'us-east-2');
 });
 
 test('deployment overrides use the same messaging names as services', () => {

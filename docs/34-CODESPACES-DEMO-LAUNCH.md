@@ -1,7 +1,8 @@
 # Codespaces launch and demonstration
 
-Updated 2026-11-16. GitHub destination: [StableCoins](https://github.com/kirankumarns-Cognizant/StableCoins).
-AWS destination: account `640237069320`, application Region `us-east-1`, IAM Identity Center authentication.
+Updated 2026-11-17. GitHub destination: [StableCoins](https://github.com/kirankumarns-Cognizant/StableCoins).
+AWS target: account `640237069320`, application Region `us-west-2` (Oregon). Codespaces AWS authentication remains pending; see the Oregon cutover section.
+For current region setup, follow [Oregon migration and cutover](#oregon-migration-and-cutover-2026-11-17).
 The owner requested step 11 preparation before AWS deployment. Codespaces is the
 container host for acceptance; deploying the application to AWS is a later gate.
 
@@ -140,7 +141,7 @@ aws configure sso --profile stablecoins-demo --use-device-code --no-browser
 aws sts get-caller-identity --profile stablecoins-demo --query Account --output text
 ```
 
-Use account `640237069320` and default application Region `us-east-1`. Enter the
+Use account `640237069320` and target application Region `us-west-2`. Earlier east-region examples below predate the Oregon cutover. Enter the
 device code on AWS's sign-in page, never in chat or a committed file. The **SSO
 region** is where the identity directory resides and can differ from the
 application Region. Select the permission set actually assigned to the account.
@@ -467,6 +468,10 @@ PAY-52272AAC4E14 preparation for execution. Live AI/testnet acceptance is separa
 
 ### Enable the local secret-provider service (2026-11-17)
 
+Historical emulation setup: the owner subsequently selected real AWS Secrets
+Manager for Codespaces. Do not copy credentials into LocalStack as part of the
+Oregon cutover; use the outstanding credential-wiring gate below.
+
 The agent uses the shared AWS endpoint. In Compose, that endpoint is LocalStack,
 whose prior fixed SERVICES list omitted Secrets Manager. The service list now
 defaults to sqs,events,secretsmanager and is configurable with LOCALSTACK_SERVICES
@@ -493,7 +498,7 @@ The change does not enable the agent or create a key. Keep the currently running
 application available until applying the update; no AWS deployment is involved.
 
 
-## Source synchronization: local ? GitHub ? Codespaces
+## Source synchronization: local to GitHub to Codespaces
 
 Implement and validate source changes locally, publish them to GitHub, then update
 the Codespace from `main`. A change made only in a Codespace does not exist in
@@ -525,3 +530,106 @@ and check `git status --short --untracked-files=normal` again. Matching commit I
 and a clean tracked checkout establish source synchronization at that point.
 Ignored private settings deliberately differ between environments. Restart the
 application separately to load changed code or configuration.
+
+
+## Oregon migration and cutover (2026-11-17)
+
+The owner selected **us-west-2 (Oregon)** as the application target. Earlier
+us-east-1 commands and screenshots in this document are historical evidence.
+Provisioning the new resources does not establish a completed application cutover.
+
+### Confirmed cloud setup
+
+| Resource | Oregon value / evidence |
+|---|---|
+| AWS account | `640237069320`, verified in CloudShell under the existing federated operator role |
+| User pool | `us-west-2_GHIZSiqQY`, `stablecoins-demo` |
+| Login domain | `https://stablecoins-640237069320-demo-usw2.auth.us-west-2.amazoncognito.com` |
+| Browser client | `7u19f3qbnaot6mf8f0tv7295fo`, code flow, no client secret |
+| Service client | `2168jq8fqbnurpa15frr2j7ljj`, client-credentials flow, `stablecoins/internal` |
+| Service credentials | `stablecoins/demo/cognito-service-client`, stored directly in Oregon Secrets Manager; ARN suffix `Rri4qw` |
+| OpenAI secret | Replication to Oregon requested; last reported status `InProgress`, completion not yet observed |
+| Demo users | All six created; all six permanent-password operations reported successful |
+
+The service-credential JSON uses `clientId` and `clientSecret`. Its reference is
+not evidence that a running service has retrieved or used it. Secret values,
+passwords, wallet material and AWS session credentials are excluded from Git.
+The browser callback remains the existing Codespaces HTTPS URL ending
+`/auth/callback`; moving Cognito does not change the UI hostname.
+
+### Apply the published configuration helper
+
+Run commands individually in Codespaces, after pulling this published change.
+First inspect the proposed update without writing private files:
+
+```bash
+node scripts/configure-oregon-demo.cjs --preview
+```
+
+Then apply it:
+
+```bash
+node scripts/configure-oregon-demo.cjs --apply
+```
+
+This demo-specific helper updates `.env` and the existing complete
+`.local/demo-connections.properties`. It validates the six known memberships,
+replaces their east subjects with the verified Oregon subjects, refreshes managed
+identity/region placeholders, and saves owner-only backups in ignored
+`.local/backups/oregon-demo-<id>/`. A second apply is a no-op. Missing, duplicated
+or customized demo memberships require private review rather than being silently
+replaced. Preview and validation failures leave both files unchanged.
+
+The callback, database password, customer IDs, routing policies, wallet settings,
+evidence TTL overrides and unrelated configuration are preserved. The existing
+connections-file permissions are retained; `.env` is restricted to its owner.
+The routing agent is explicitly disabled during cutover. No cloud resources,
+users, passwords, database rows or immutable payment evidence are changed by this
+helper. Existing records retain their original subject IDs as historical evidence.
+
+The committed defaults in the shared configuration, Compose and Java readers now
+use Oregon; explicit environment overrides still take precedence. Existing private
+copies keep their settings until this helper is applied. LocalStack's default
+region follows `AWS_REGION`; new Oregon emulated queues are separate from any old
+east-region queues. Preserve the volumes and diagnose old pending work separately.
+
+Restart through the unified command, then sign out and sign in securely as
+`demo-a-operator` with its Oregon password:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+```
+
+Expected UI result: Customer A, `PAYMENT_OPERATOR`, existing simulated funding
+account and customer policy. Use a new payment with a future deadline and fresh
+review; old expired evidence must not be reused. Verify each approver and Customer B
+membership before claiming the identity cutover complete.
+
+### Outstanding gates
+
+- Confirm OpenAI replica status is `InSync` and metadata is readable in Oregon.
+- Establish AWS authentication for Codespaces. The `d-9267f3e582` portal was
+  confirmed as an **account instance** of Identity Center in Oregon. It authenticated
+  the user but returned no AWS accounts; it cannot supply permission-set account
+  access. The working CloudShell role is a separate authenticated session.
+- Implement the requested ignored-local-file / real-AWS-Secrets-Manager runtime
+  credential workflow. Current Compose secret retrieval still shares the LocalStack
+  endpoint with messaging; this update does not redirect it to real AWS or import
+  secrets into LocalStack. Keep agent execution disabled until that wiring is tested.
+- Apply/restart and observe Oregon Cognito UI login, memberships and renewal.
+- Complete live agent inference, two-user approval and public-testnet payment,
+  ledger/reconciliation evidence. AWS application deployment remains separate;
+  changing the Region does not deploy ECS, Aurora or API Gateway.
+- Inventory any actual east-region deployments before retiring them. No deletion,
+  database migration, Identity Center change or cloud-stack deployment was performed.
+
+Resource provisioning was executed in CloudShell under the owner's authenticated
+session. Application code and reusable configuration tooling follow local validation,
+GitHub publication and then Codespaces pull/apply. Private configuration stays ignored.
+
+Local validation for this change: 100 Node/frontend tests passed; frontend build
+and lint passed; infrastructure TypeScript build and all 12 tests passed. The Java
+reactor compiled all eight modules and passed 20 selected configuration, identity,
+messaging and signing regression tests, with no failures or skips in that selection.
+Docker startup, PostgreSQL acceptance, real AWS secret retrieval and Oregon browser
+sign-in were not executed locally and remain separate Codespaces/cloud gates.

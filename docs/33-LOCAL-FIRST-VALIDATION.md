@@ -503,3 +503,15 @@ requires a model, secret, customer allowlist and positive pricing estimates.
 Validation for this configuration change: Compose YAML was parsed locally and
 34 relevant Node tests passed. Local Docker execution is unavailable; actual
 service enablement and key retrieval still require Codespaces verification.
+
+
+## Oregon configuration cutover (2026-11-17)
+
+Target AWS region is now us-west-2. Existing private .env/connection copies must
+be explicitly migrated after pulling; their defaults do not update automatically.
+Run `node scripts/configure-oregon-demo.cjs --preview`, then `--apply` separately.
+The helper backs up both private files, validates/migrates the six known subjects,
+retains customer policies/passwords/callback/TTLs and keeps the routing agent off.
+Restart and perform fresh Oregon sign-in before connected payment testing.
+See [the cutover evidence and outstanding gates](34-CODESPACES-DEMO-LAUNCH.md#oregon-migration-and-cutover-2026-11-17).
+Startup health success does not prove real AWS secret access or Cognito login.

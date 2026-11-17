@@ -21,7 +21,7 @@ public class EventingConfig {
     @Value("${connections.aws.endpoint:}")
     private String localstackUrl;
 
-    @Value("${connections.aws.region:us-east-1}")
+    @Value("${connections.aws.region:us-west-2}")
     private String region;
 
     @Value("${connections.aws.local-access-key:test}")
