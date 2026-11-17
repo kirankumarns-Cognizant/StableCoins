@@ -675,3 +675,35 @@ No roles, approval requirements, payment records or financial controls change.
 Local validation: frontend TypeScript/Vite build and lint passed; all 26 frontend
 tests passed, including logout URL safety and renewal cancellation. Real hosted
 Cognito user switching must still be verified in the Codespaces browser.
+
+
+### Keeping a connected demo Codespace active - 2026-11-17
+
+For the existing demo Codespace with a confirmed 30-minute idle timeout, run this
+explicit foreground helper in a separate connected Codespaces terminal:
+
+```bash
+node scripts/codespaces-demo-keepalive.cjs
+```
+
+It prints an initial timestamp and another every 28 minutes. GitHub documents
+terminal input/output as activity that resets the idle timeout:
+https://docs.github.com/en/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces
+
+Keep the terminal connected during the rehearsal; Ctrl+C stops the helper. It is
+not installed as a hidden background task, cron job or automatic startup hook.
+It does not start/restart services, forward ports, check health, change passwords,
+extend sessions/quotes, or modify GitHub account/organization settings. It cannot
+revive a stopped Codespace, guarantee activity while disconnected, override an
+organization's shorter timeout, or bypass the documented 12-hour maximum runtime.
+A 28-minute interval assumes the observed 30-minute timeout; a delayed process
+can still miss that window. Codespaces compute usage continues while running.
+
+After a stopped Codespace is resumed, run the unified startup command to recover
+PostgreSQL, LocalStack, backends and React. A keep-alive line is not health proof;
+smoke checks cover backends only. Use the helper during the demo and stop it when
+finished. This script follows local validation, GitHub publication, Codespaces pull.
+
+Local validation: Node syntax/help checks and all 17 keep-alive/workbench tests
+passed. Timer tests use an injected scheduler; an actual 28-minute Codespaces
+idle-reset observation has not been performed locally.
