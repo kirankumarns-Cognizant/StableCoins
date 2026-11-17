@@ -633,3 +633,17 @@ reactor compiled all eight modules and passed 20 selected configuration, identit
 messaging and signing regression tests, with no failures or skips in that selection.
 Docker startup, PostgreSQL acceptance, real AWS secret retrieval and Oregon browser
 sign-in were not executed locally and remain separate Codespaces/cloud gates.
+
+
+### Preparation result display correction - 2026-11-17
+
+On Intent & routing, a successful preparation previously displayed Status READY
+alongside Reason Pending because a missing failure code used the generic field
+fallback. READY now displays Result Preparation completed; Reason is shown only
+when the backend records a failure code. PENDING continues to show its actual
+status, without inventing a failure reason. This is a display correction only: it
+does not refresh an expired quote, create another review, enable the agent, approve
+a payment, or change MOCK readiness into public-testnet evidence.
+
+Local validation: frontend TypeScript/Vite build and lint passed; all 23 existing
+frontend tests passed. Updated rendering still requires confirmation in Codespaces.
