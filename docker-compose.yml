@@ -232,7 +232,7 @@ services:
     image: localstack/localstack:3
     container_name: stablecoins-localstack
     environment:
-      SERVICES: sqs,events
+      SERVICES: ${LOCALSTACK_SERVICES:-sqs,events,secretsmanager}
       DEFAULT_REGION: us-east-1
       DEBUG: "0"
     ports:

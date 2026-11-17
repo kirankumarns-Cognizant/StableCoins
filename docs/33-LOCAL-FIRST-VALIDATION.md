@@ -476,3 +476,30 @@ Separately, the owner's Codespaces verification run
 613 passed, zero failures/errors, and only RoutingAgentLiveTest skipped. The
 required database evidence gate passed. This is code/database verification;
 live application AI inference and public-testnet payment acceptance remain open.
+
+
+## LocalStack Secrets Manager availability (2026-11-17)
+
+The Codespaces DescribeSecret request returned InternalFailure because the prior
+Compose SERVICES list enabled only sqs,events. Compose now reads the non-secret
+LOCALSTACK_SERVICES setting, defaulting to sqs,events,secretsmanager; the environment
+template includes that value. Existing .env files without the setting use the new
+default. An explicit older override must include secretsmanager to enable it.
+
+Follow local implementation/test -> GitHub publication -> Codespaces pull ->
+unified startup. The startup command applies the updated LocalStack container
+configuration and the previously saved private 15-minute MOCK evidence settings.
+Do not run two startup commands concurrently. Following startup, verify service
+availability with the metadata-only DescribeSecret command in the Codespaces
+guide. A missing secret is a separate result from a disabled service.
+
+The Node configuration check on the Codespaces host can show an empty AWS endpoint;
+Compose injects LOCALSTACK_URL into backend containers. Real AWS secrets are not
+automatically copied to LocalStack. Local secret storage is emulated; an OpenAI
+model call is real only when a successful provider response is recorded. No API
+key is added to Git or printed by these metadata checks. Agent enablement still
+requires a model, secret, customer allowlist and positive pricing estimates.
+
+Validation for this configuration change: Compose YAML was parsed locally and
+34 relevant Node tests passed. Local Docker execution is unavailable; actual
+service enablement and key retrieval still require Codespaces verification.

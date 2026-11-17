@@ -139,3 +139,14 @@ Existing Dockerfiles, health checks, configuration and volumes remain authoritat
 Failure stops further starts and retains diagnostic/progress reporting. This
 implements local resource scheduling within ADR-010; it adds no service and does
 not change AWS deployment architecture or financial execution controls.
+
+
+## Local secret-provider service availability (2026-11-17)
+
+The local Compose service list is configurable through LOCALSTACK_SERVICES and
+defaults to sqs,events,secretsmanager. The existing agent key provider already
+uses the shared local AWS endpoint; Secrets Manager must therefore be enabled
+for local key retrieval. This is an emulated secret store, separate from real
+AWS Secrets Manager and its KMS controls. It does not create/import an API key,
+enable the agent, or change AWS deployment architecture. Private values remain
+excluded from Git.

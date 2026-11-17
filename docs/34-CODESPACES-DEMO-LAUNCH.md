@@ -463,3 +463,31 @@ has passed 34 relevant Node checks locally; actual sequential Docker startup
 remains to be checked here. Once startup succeeds, follow the numbered presenter
 navigation with a new payment and future deadline; do not reuse the expired
 PAY-52272AAC4E14 preparation for execution. Live AI/testnet acceptance is separate.
+
+
+### Enable the local secret-provider service (2026-11-17)
+
+The agent uses the shared AWS endpoint. In Compose, that endpoint is LocalStack,
+whose prior fixed SERVICES list omitted Secrets Manager. The service list now
+defaults to sqs,events,secretsmanager and is configurable with LOCALSTACK_SERVICES
+in private .env. The committed .env.example documents this non-secret setting.
+
+After pulling the published change, run the unified startup command, separately
+from the pull and after any previous startup has ended:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+```
+
+Once startup succeeds, check metadata only:
+
+```bash
+docker compose exec -T localstack awslocal secretsmanager describe-secret --secret-id stablecoins/demo/openai-api-key --region us-east-1 --query '{Name:Name,ARN:ARN}' --output json
+```
+
+ResourceNotFoundException means the enabled service has no secret under that name;
+it is not an OpenAI authentication failure. Real AWS secret metadata shown earlier
+does not establish a local copy. Enter key material only through a hidden private
+setup flow; never place it in this document, Git or terminal command arguments.
+The change does not enable the agent or create a key. Keep the currently running
+application available until applying the update; no AWS deployment is involved.
