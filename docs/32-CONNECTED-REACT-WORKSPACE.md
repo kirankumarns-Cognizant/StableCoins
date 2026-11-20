@@ -332,3 +332,9 @@ assessment, provider findings and rationale; it does not fabricate a quote or al
 quote acceptance, approval or execution. Read-only agent explanations retain their
 existing server controls. This case is covered by the synthetic browser rehearsal;
 it is separate from live Cognito, public-testnet and financial acceptance.
+
+The catalog normalizes Hibernate JSONB epoch-second deadlines to ISO-8601 UTC
+text before returning deliver_by. Existing ISO deadlines and legacy nulls remain
+supported; fractional seconds are preserved without double conversion. This is
+a read projection fix and does not rewrite confirmed intents or require a data
+migration. The table uses the plain-text heading Created (newest first).

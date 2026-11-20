@@ -65,9 +65,16 @@ public class WorkbenchService {
  }
  private List<Map<String,Object>> rows(String sql,Object id){return jdbc.query(sql,(r,n)->{
   var row=new LinkedHashMap<String,Object>();var meta=r.getMetaData();
-  for(int col=1;col<=meta.getColumnCount();col++) {Object value=r.getObject(col);row.put(meta.getColumnLabel(col),value instanceof BigDecimal d?d.toPlainString():value instanceof Timestamp t?t.toInstant().toString():value);}
+  for(int col=1;col<=meta.getColumnCount();col++) {String column=meta.getColumnLabel(col);Object value=r.getObject(col);if("deliver_by".equals(column)&&value instanceof String stored)value=deadline(stored);row.put(column,value instanceof BigDecimal d?d.toPlainString():value instanceof Timestamp t?t.toInstant().toString():value);}
   return row;
  },id);}
+ /** Hibernate JSONB can store Instant as epoch seconds; the public catalog always exposes ISO text. */
+ private String deadline(String stored){
+  if(!stored.matches("-?\\d+(?:\\.\\d{1,9})?"))return stored;
+  try{
+   return mapper.readerFor(java.time.Instant.class).with(DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS).readValue(stored).toString();
+  }catch(com.fasterxml.jackson.core.JsonProcessingException invalid){return stored;}
+ }
  /** Decimal strings preserve wei and ledger precision across the JSON/JavaScript boundary. */
  public JsonNode exact(Object value){return strings(mapper.valueToTree(value));}
  private JsonNode strings(JsonNode node){
