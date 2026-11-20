@@ -33,7 +33,7 @@ public class WorkbenchService {
   result.put("policy",exact(policies.getPolicies().get(actor.customerId())));
   result.put("accounts",rows("select account_id,currency,account_type,balance,status from account where customer_id=? and status='ACTIVE' order by account_id limit 100",actor.customerId()));
   result.put("beneficiaries",rows("select beneficiary_id,name,country,currency,wallet_address,status from beneficiary where customer_id=? and status='ACTIVE' order by beneficiary_id limit 100",actor.customerId()));
-  result.put("payments",rows("select p.payment_id,p.correlation_id,p.amount,p.source_currency,p.status,p.created_at from payment p join account a on a.account_id=p.sender_account_id where a.customer_id=? order by p.created_at desc,p.payment_id limit 50",actor.customerId()));
+  result.put("payments",rows("select p.payment_id,p.correlation_id,p.amount,p.source_currency,p.status,p.created_at,p.intent_snapshot #>> '{instruction,deliverBy}' as deliver_by from payment p join account a on a.account_id=p.sender_account_id where a.customer_id=? order by p.created_at desc,p.payment_id limit 50",actor.customerId()));
   result.put("paymentWindowLimit",50);result.put("catalogLimit",100);return result;
  }
  @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)

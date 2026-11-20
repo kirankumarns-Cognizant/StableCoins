@@ -317,3 +317,18 @@ warnings; 30 frontend unit tests and 30 synthetic headless browser checks passed
 The browser fixture deliberately models classic hosted UI ignoring prompt=login,
 then verifies logout-before-login, preserved PKCE, cleared customer evidence and
 two different secure-login identities. No live AWS sign-in was executed.
+
+## Payment deadlines and reviews without an eligible route
+
+The recent customer payment list is ordered by creation time descending and shows
+both Created and Deliver by. Deliver by comes from the immutable confirmed intent;
+it is distinct from the shorter quote expiry shown on Quote & approvals. Displayed
+dates include the browser time zone and UTC offset. Legacy payments without an
+intent show No confirmed deadline. No database migration is required.
+
+A completed preparation can produce a review with no selected quote when no route
+is eligible. The API returns quote: null in that case. The workspace displays the
+assessment, provider findings and rationale; it does not fabricate a quote or allow
+quote acceptance, approval or execution. Read-only agent explanations retain their
+existing server controls. This case is covered by the synthetic browser rehearsal;
+it is separate from live Cognito, public-testnet and financial acceptance.
