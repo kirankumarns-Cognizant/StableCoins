@@ -338,3 +338,8 @@ text before returning deliver_by. Existing ISO deadlines and legacy nulls remain
 supported; fractional seconds are preserved without double conversion. This is
 a read projection fix and does not rewrite confirmed intents or require a data
 migration. The table uses the plain-text heading Created (newest first).
+
+Recent-payment timestamps display date and time on the first line, with the
+UTC offset and browser time zone below. Payment identifiers and state badges stay
+on one line; narrow screens scroll within the table instead of widening the page.
+The two-line display retains a machine-readable ISO timestamp in the time element.

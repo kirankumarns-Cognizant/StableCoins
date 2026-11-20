@@ -3,3 +3,7 @@
 .skip-link{position:fixed;top:-100px;left:16px;z-index:1000}.skip-link:focus{top:12px}main:focus{outline:none}
 
 .topbar>div{flex-wrap:wrap;justify-content:flex-end;min-width:0}.signed-in-account{display:flex;flex-direction:column;align-items:flex-end;max-width:340px;min-width:0}.signed-in-user{text-align:right;font-size:11px;line-height:1.5;overflow-wrap:anywhere;max-width:100%}.signed-in-user span,.signed-in-user small{display:block}.signed-in-user strong{color:#215663}.signed-in-user small{font-size:10px;color:#637983}
+
+.recent-payments th,.recent-payments td:first-child,.recent-payments td:nth-child(3),.recent-payments .badge{white-space:nowrap;overflow-wrap:normal}
+.timestamp-date,.timestamp-zone{display:block;white-space:nowrap}
+.timestamp-zone{font-size:11px;color:#637983;line-height:1.5;margin-top:3px}

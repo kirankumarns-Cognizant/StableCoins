@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {time} from '../src/lib/format.ts'
+import {time,timeParts} from '../src/lib/format.ts'
 test('dates display the local zone and offset without changing the stored instant',()=>{
  const previous=process.env.TZ
  try{
@@ -18,4 +18,18 @@ test('dates display the local zone and offset without changing the stored instan
 test('missing and malformed dates are not represented as valid deadlines',()=>{
  for(const value of [null,undefined,''])assert.equal(time(value),'Pending')
  assert.equal(time('not-a-date'),'Unavailable')
+})
+
+test('table timestamps separate date and time from the zone without changing the instant',()=>{
+ const previous=process.env.TZ
+ try{
+  process.env.TZ='Asia/Kolkata'
+  const parts=timeParts('2026-11-20T15:21:14Z')
+  assert.equal(parts.iso,'2026-11-20T15:21:14.000Z')
+  assert.ok(parts.dateTime.includes('8:51:14'),parts.dateTime)
+  assert.ok(!parts.dateTime.includes('GMT')&&!parts.dateTime.includes('Asia/'))
+  assert.match(parts.timeZone,/^GMT\+05:30 \(Asia\/(Calcutta|Kolkata)\)$/)
+  assert.equal(time('2026-11-20T15:21:14Z'),parts.dateTime+' '+parts.timeZone)
+  for(const value of [null,undefined,'','not-a-date'])assert.equal(timeParts(value),null)
+ }finally{if(previous===undefined)delete process.env.TZ;else process.env.TZ=previous}
 })
