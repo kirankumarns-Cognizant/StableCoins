@@ -707,3 +707,44 @@ finished. This script follows local validation, GitHub publication, Codespaces p
 Local validation: Node syntax/help checks and all 17 keep-alive/workbench tests
 passed. Timer tests use an injected scheduler; an actual 28-minute Codespaces
 idle-reset observation has not been performed locally.
+
+
+### Fresh Cognito sign-in after sign-out - 2026-11-20
+
+The Oregon demo domain was created with classic hosted UI (managed login version 1).
+AWS documents that `prompt=login` is supported only by managed login, not classic
+hosted UI. Consequently this parameter alone cannot require fresh credentials.
+The existing explicit sign-out already visits the configured Cognito `/logout`
+endpoint after clearing application state and cancelling renewal.
+
+Secure sign-in now also visits that logout endpoint before authorization, clearing
+a retained hosted session even if an earlier sign-out was interrupted. It returns
+to the registered application root, consumes a one-time pending-login marker and
+continues at `/oauth2/authorize` with the original S256 PKCE challenge and state.
+The marker is bound to the configured client/endpoints, expires after ten minutes
+and cannot supply an arbitrary redirect. No PKCE parameters are sent to `/logout`.
+No additional AWS resources or AWS CLI credentials are needed for browser sign-in.
+The configured client must still list the exact UI root in Allowed sign-out URLs
+and `/auth/callback` in Allowed callback URLs. Unsupported identity domains keep
+the existing provider-specific fallback; no external logout endpoint is guessed.
+
+Explicit sign-out removes pending login data while preserving customer-scoped
+financial idempotency keys. Tokens remain in memory and API membership/roles remain
+authoritative. Hosted logout does not claim to revoke already issued bearer tokens
+or end sessions at external social/OIDC identity providers. No architecture change.
+
+Source: [AWS authorization endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html)
+and [AWS logout endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html).
+
+Acceptance after the approved publication batch: sign in as demo-a-operator, sign
+out, use secure sign-in and verify that a credential form is shown; sign in as
+demo-a-approver-one and confirm the server-verified username and roles changed.
+Repeat with demo-a-approver-two. A synthetic provider rehearsal is not live Cognito
+acceptance. This change is included with the signed-in username display in the
+approved publication batch. Live Codespaces acceptance remains pending.
+
+Local validation for this change: TypeScript/Vite build and lint passed without
+warnings; 30 frontend unit tests and 30 synthetic headless browser checks passed.
+The browser fixture deliberately models classic hosted UI ignoring prompt=login,
+then verifies logout-before-login, preserved PKCE, cleared customer evidence and
+two different secure-login identities. No live AWS sign-in was executed.

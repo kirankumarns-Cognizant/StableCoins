@@ -1,5 +1,5 @@
 export type Row = Record<string, string | number | null>
-export interface Catalog {customerId:string;actorId:string;roles:string[];policy:{version:string;allowedOutcomes:string[];maximumFeeUsd:string;requiredApprovals:number}|null;accounts:Row[];beneficiaries:Row[];payments:Row[];paymentWindowLimit:number;catalogLimit:number}
+export interface Catalog {customerId:string;actorId:string;actorUsername?:string;roles:string[];policy:{version:string;allowedOutcomes:string[];maximumFeeUsd:string;requiredApprovals:number}|null;accounts:Row[];beneficiaries:Row[];payments:Row[];paymentWindowLimit:number;catalogLimit:number}
 export interface Payment {paymentId:string;correlationId:string;amount:string|number;sourceCurrency:string;status:string;intent?:{instruction:{requiredOutcome:string;deliverBy:string;maximumFee:string;priority:string};policy:{requiredApprovals:number}}}
 export interface Section<T> {status:string;reason?:string;data?:T}
 export interface Entry {accountCode:string;asset:string;debit:string;credit:string}

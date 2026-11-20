@@ -26,4 +26,18 @@ class WorkbenchControllerTest {
  @Test void approverNeedsOperatorReadPermission()throws Exception{mvc.perform(get("/api/v1/payments/workbench").with(jwt().jwt(j->j.subject("approver-only")))).andExpect(status().isForbidden());verifyNoInteractions(service);}
  @Test void verifiedSubjectResolvesOnlyServerMembership()throws Exception{when(service.catalog(new AuthorizedCustomer(customer,"operator"))).thenReturn(Map.of("customerId",customer));mvc.perform(get("/api/v1/payments/workbench").with(jwt().jwt(j->j.subject("operator").claim("customerId",UUID.randomUUID().toString())))).andExpect(status().isOk()).andExpect(jsonPath("$.customerId").value(customer.toString())).andExpect(header().string("Cache-Control",org.hamcrest.Matchers.containsString("no-store")));verify(service).catalog(new AuthorizedCustomer(customer,"operator"));}
  @Test void evidenceReadCannotBeUsedAsMutationEndpoint()throws Exception{mvc.perform(post("/api/v1/payments/PAY-1/evidence").with(jwt().jwt(j->j.subject("operator")))) .andExpect(status().isMethodNotAllowed()).andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED")).andExpect(header().string("Allow",org.hamcrest.Matchers.containsString("GET")));verifyNoInteractions(service);}
+ @Test void catalogExposesVerifiedUsernameWithoutChangingMembership()throws Exception{
+  when(service.catalog(new AuthorizedCustomer(customer,"operator"))).thenReturn(Map.of("actorId","operator","roles",List.of("PAYMENT_OPERATOR")));
+  mvc.perform(get("/api/v1/payments/workbench").with(jwt().jwt(j->j.subject("operator").claim("username","demo-a-operator").claim("roles",List.of("PAYMENT_APPROVER")))).header("X-Username","someone-else"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.actorUsername").value("demo-a-operator")).andExpect(jsonPath("$.actorId").value("operator")).andExpect(jsonPath("$.roles[0]").value("PAYMENT_OPERATOR"));
+ }
+ @Test void catalogFallsBackToSubjectForMissingOrInvalidUsername()throws Exception{
+  when(service.catalog(new AuthorizedCustomer(customer,"operator"))).thenReturn(Map.of("actorId","operator"));
+  mvc.perform(get("/api/v1/payments/workbench").with(jwt().jwt(j->j.subject("operator"))).header("X-Username","untrusted"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.actorUsername").value("operator"));
+  for(Object invalid:List.of(" ","bad\nname","x".repeat(129),List.of("not-a-string"))){
+   mvc.perform(get("/api/v1/payments/workbench").with(jwt().jwt(j->j.subject("operator").claim("username",invalid))))
+    .andExpect(status().isOk()).andExpect(jsonPath("$.actorUsername").value("operator"));
+  }
+ }
 }

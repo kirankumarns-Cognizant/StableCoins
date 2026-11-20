@@ -39,7 +39,7 @@ const fixture=createHttpServer(async(req,res)=>{
   if(path.endsWith('/execution')){if(approvals.size<2)return reply({code:'APPROVALS_REQUIRED'},409);executed=true;return reply({executionId:'synthetic-execution'},202)}
   return reply({code:'UNSUPPORTED_FIXTURE_COMMAND'},404)
  }
- if(path==='/payments/workbench')return reply({customerId:customer,actorId:actor,roles:actor==='synthetic-operator'?['PAYMENT_OPERATOR']:['PAYMENT_OPERATOR','PAYMENT_APPROVER'],policy:{version:'synthetic-policy',allowedOutcomes:['USDC_WALLET','SIMULATED_BANK_USD','SIMULATED_BANK_INR'],maximumFeeUsd:'25.00',requiredApprovals:2},accounts:[{account_id:'22222222-2222-2222-2222-222222222222',currency:'USD',balance:'100000.00',status:'ACTIVE'}],beneficiaries:[{beneficiary_id:'33333333-3333-3333-3333-333333333333',name:'SYNTHETIC UI TEST supplier',currency:'USD'}],payments:created?[{payment_id:pay,amount:'10000.00',status:payment().status,created_at:stamp}]:[],paymentWindowLimit:50,catalogLimit:100})
+ if(path==='/payments/workbench')return reply({customerId:customer,actorId:actor,actorUsername:actor.replace('synthetic-','demo-'),roles:actor==='synthetic-operator'?['PAYMENT_OPERATOR']:['PAYMENT_OPERATOR','PAYMENT_APPROVER'],policy:{version:'synthetic-policy',allowedOutcomes:['USDC_WALLET','SIMULATED_BANK_USD','SIMULATED_BANK_INR'],maximumFeeUsd:'25.00',requiredApprovals:2},accounts:[{account_id:'22222222-2222-2222-2222-222222222222',currency:'USD',balance:'100000.00',status:'ACTIVE'}],beneficiaries:[{beneficiary_id:'33333333-3333-3333-3333-333333333333',name:'SYNTHETIC UI TEST supplier',currency:'USD'}],payments:created?[{payment_id:pay,amount:'10000.00',status:payment().status,created_at:stamp}]:[],paymentWindowLimit:50,catalogLimit:100})
  if(path==='/payments/'+pay)return reply(payment())
  if(path.endsWith('/evidence'))return reply(evidence())
  if(path.endsWith('/journey'))return reply({currentStatus:payment().status,steps:[{fromStatus:'CREATED',toStatus:payment().status,reason:'SYNTHETIC UI TEST',actorService:'synthetic-fixture',timestamp:stamp}]})
@@ -48,6 +48,10 @@ const fixture=createHttpServer(async(req,res)=>{
  return reply({code:'NOT_FOUND'},404)
 })
 await new Promise(resolve=>fixture.listen(0,'127.0.0.1',resolve));process.env.PAYMENT_SERVICE_URL=`http://127.0.0.1:${fixture.address().port}`
+// Intercept a synthetic Cognito domain: never contact real AWS or use real credentials.
+const provider='https://synthetic.auth.us-west-2.amazoncognito.com'
+Object.assign(process.env,{IDENTITY_AUTHORIZATION_URI:provider+'/oauth2/authorize',IDENTITY_TOKEN_URI:provider+'/oauth2/token',IDENTITY_CLIENT_ID:'synthetic-public',IDENTITY_REDIRECT_URI:'http://127.0.0.1:5190/auth/callback',IDENTITY_ISSUER_URI:'https://cognito-idp.us-west-2.amazonaws.com/synthetic',PUBLIC_API_BASE_URL:'/api/v1'})
+let providerUser='synthetic-operator',logoutCount=0,authorization=null
 let vite,edge,socket;const checks=[]
 try{
  vite=await createServer({root,configFile:resolve(root,'vite.config.ts'),server:{port:5190,host:'127.0.0.1',strictPort:true}});await vite.listen()
@@ -58,18 +62,41 @@ try{
  let port;await until(async()=>{try{port=(await readFile(resolve(profile,'DevToolsActivePort'),'utf8')).split('\n')[0];return Boolean(port)}catch{return false}},'Edge DevTools')
  const targets=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();socket=new WebSocket(targets.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject})
  const inflight=new Map();let sequence=0;const exceptions=[]
- socket.onmessage=event=>{const response=JSON.parse(event.data);if(response.method==='Runtime.exceptionThrown')exceptions.push(response.params.exceptionDetails.text);if(response.id){const waiter=inflight.get(response.id);inflight.delete(response.id);if(response.error)waiter.reject(new Error(JSON.stringify(response.error)));else waiter.resolve(response.result)}}
+ socket.onmessage=event=>{const response=JSON.parse(event.data);if(response.method==='Fetch.requestPaused'){void identityRequest(response.params).catch(error=>exceptions.push(String(error)));return}if(response.method==='Runtime.exceptionThrown')exceptions.push(response.params.exceptionDetails);if(response.id){const waiter=inflight.get(response.id);inflight.delete(response.id);if(response.error)waiter.reject(new Error(JSON.stringify(response.error)));else waiter.resolve(response.result)}}
  const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{inflight.delete(id);reject(new Error('CDP timeout '+method))},15000);inflight.set(id,{resolve:value=>{clearTimeout(timer);resolve(value)},reject:error=>{clearTimeout(timer);reject(error)}});socket.send(JSON.stringify({id,method,params}))})
+ const identityRequest=async({requestId,request})=>{
+  const url=new URL(request.url)
+  const fulfill=(responseCode,text='',headers={})=>send('Fetch.fulfillRequest',{requestId,responseCode,responseHeaders:Object.entries({'Cache-Control':'no-store',...headers}).map(([name,value])=>({name,value})),body:Buffer.from(text).toString('base64')})
+  const redirect=location=>fulfill(302,'',{Location:location})
+  if(url.pathname==='/favicon.ico')return fulfill(204)
+  if(url.pathname==='/logout'){assert.equal(url.searchParams.get('client_id'),'synthetic-public');assert.equal(url.searchParams.get('logout_uri'),'http://127.0.0.1:5190/');providerUser=null;logoutCount++;return redirect(url.searchParams.get('logout_uri'))}
+  if(url.pathname==='/oauth2/authorize'){
+   authorization=url;assert.equal(url.searchParams.get('code_challenge_method'),'S256')
+   // Model classic hosted UI: prompt=login alone does not suppress its retained session.
+   if(providerUser)return redirect(url.searchParams.get('redirect_uri')+'?code='+providerUser+'&state='+url.searchParams.get('state'))
+   const links=['synthetic-operator','synthetic-approver-a','synthetic-approver-b'].map(actor=>'<a href="'+provider+'/choose?actor='+actor+'">Choose '+actor+'</a>').join('<br>')
+   return fulfill(200,'<!doctype html><title>Synthetic identity</title><p>SYNTHETIC Cognito sign-in form</p>'+links,{'Content-Type':'text/html'})
+  }
+  if(url.pathname==='/choose'){providerUser=url.searchParams.get('actor');return redirect(authorization.searchParams.get('redirect_uri')+'?code='+providerUser+'&state='+authorization.searchParams.get('state'))}
+  if(url.pathname==='/oauth2/token'){
+   const body=new URLSearchParams(request.postData)
+   assert.equal(body.get('grant_type'),'authorization_code');assert.equal(body.has('client_secret'),false)
+   assert.equal(Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body.get('code_verifier')))).toString('base64url'),authorization.searchParams.get('code_challenge'))
+   return fulfill(200,JSON.stringify({access_token:body.get('code'),token_type:'Bearer',expires_in:3600}),{'Content-Type':'application/json','Access-Control-Allow-Origin':'http://127.0.0.1:5190'})
+  }
+  throw Error('Unexpected synthetic identity request '+url.pathname)
+ }
  const ev=async expression=>{const result=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(JSON.stringify(result.exceptionDetails));return result.result.value}
- const body=()=>ev('document.body.innerText');const has=async text=>(await body()).includes(text)
+ const body=()=>ev("document.body?.innerText??''");const has=async text=>(await body()).includes(text)
  const click=async label=>{await until(()=>ev(`(()=>{const element=[...document.querySelectorAll('button,a,summary')].find(e=>e.textContent.trim()===${JSON.stringify(label)});return Boolean(element&&!element.disabled)})()`),'enabled '+label);const clicked=await ev(`(()=>{const element=[...document.querySelectorAll('button,a,summary')].find(e=>e.textContent.trim()===${JSON.stringify(label)});if(!element||element.disabled)return false;element.click();return true})()`);assert.ok(clicked,'Clickable: '+label)}
  const input=async(selector,value)=>{await ev(`(()=>{const element=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)});element.dispatchEvent(new Event('input',{bubbles:true}));element.dispatchEvent(new Event('change',{bubbles:true}))})()`)}
  const navigate=async tab=>{await ev(`location.hash=${JSON.stringify('/payments/'+pay+'/'+tab)}`);await until(()=>has('PAY-UI-SYNTHETIC'),'payment '+tab)}
  const signIn=async actor=>{await click('Rehearsal: use an existing access token');await input('input[type=password]',actor);await click('Connect with access token');await until(()=>has(actor),'signed in '+actor)}
  const check=(name,condition)=>{assert.ok(condition,name);checks.push(name);console.log('PASS '+name)}
  const screenshot=async name=>{const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(resolve(artifacts,name+'.png'),Buffer.from(result.data,'base64'))}
- await send('Runtime.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:'http://127.0.0.1:5190/'})
+ await send('Runtime.enable');await send('Page.enable');await send('Fetch.enable',{patterns:[{urlPattern:provider+'/*',requestStage:'Request'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await send('Page.navigate',{url:'http://127.0.0.1:5190/'})
  await until(()=>has('Sign in with your organization'),'sign in page');await signIn('synthetic-operator');await until(()=>has('Corporate funding accounts'),'overview');check('customer catalog loaded without a browser role selector',!(await ev('Boolean(document.querySelector("[name=role]"))')))
+ check('header displays login name below signout with server roles',await ev("(()=>{const account=document.querySelector('.signed-in-account');const button=account.querySelector('button'),label=account.querySelector('.signed-in-user');return label.textContent.includes('Signed in as demo-operator')&&label.textContent.includes('payment operator')&&!label.textContent.includes('payment approver')&&label.getBoundingClientRect().top>=button.getBoundingClientRect().bottom})()"))
  holdCatalog=true;await click('Refresh');await until(()=>heldReads.length===1,'held catalog refresh');const readsWhileHeld=catalogReads
  check('refresh shows progress and prevents repeated clicks',await has('Refreshing application evidence...')&&await ev('[...document.querySelectorAll("button")].filter(e=>e.textContent==="Refreshing...").every(e=>e.disabled)'))
  await delay(5500);check('five-second polling does not abort or duplicate a slow refresh',catalogReads===readsWhileHeld)
@@ -82,7 +109,7 @@ try{
  await click('Run reasoning agent');await until(()=>has('SYNTHETIC UI TEST explanation'),'agent result');await screenshot('routing-synthetic');await ev("document.querySelector('.agent-result').closest('.card').scrollIntoView({block:'start'})");await screenshot('agent-recommendation-synthetic');await ev('window.scrollTo(0,0)');check('actual agent record fields and seven signals rendered',await has('SYNTHETIC UI FIXTURE')&&await has('seven-signal evidence'))
  await navigate('treasury');await until(()=>has('USDC available'),'treasury');check('treasury gas estimate carries captured mock evidence',await has('MOCK')&&await has('Required ETH estimate'))
  await navigate('approvals');await until(()=>has('Approve this version'),'approval');check('operator cannot click approve',await ev('[...document.querySelectorAll("button")].find(e=>e.textContent==="Approve this version").disabled'))
- for(const actor of ['synthetic-approver-a','synthetic-approver-b']){await click('Sign out / switch user');check('signout clears customer evidence '+actor,!(await has(pay)));await signIn(actor);await until(()=>has('Accept this quote'),'approver page');await click('Accept this quote');await until(()=>has('Command acknowledged'),'acceptance response');await delay(200);await click('Approve this version');await until(()=>has(actor)&&has('Command acknowledged'),'approval response');await delay(250)}
+ for(const actor of ['synthetic-approver-a','synthetic-approver-b']){await click('Sign out / switch user');await until(()=>has('Sign in with your organization'),'hosted logout return');check('signout clears customer evidence '+actor,!(await has(pay)));check('signout removes header identity '+actor,await ev("!document.querySelector('.signed-in-user')"));await signIn(actor);await navigate('approvals');await until(()=>has('Accept this quote'),'approver page');await click('Accept this quote');await until(()=>has('Command acknowledged'),'acceptance response');await delay(200);await click('Approve this version');await until(()=>has(actor)&&has('Command acknowledged'),'approval response');await delay(250)}
  await navigate('journey');await until(()=>has('Execute approved USDC payment'),'journey');await ev('document.querySelector("input[type=checkbox]").click()');await click('Execute approved USDC payment');await until(()=>has('RECONCILED'),'closure');check('one execution requested after distinct approvals',approvals.size===2&&calls.filter(c=>c.path.endsWith('/execution')).length===1)
  await navigate('blockchain');await until(()=>has('Total fee (wei)'),'chain evidence');await screenshot('blockchain-mock-synthetic');check('mock chain is not advertised as public proof',await has('MOCK - NOT PUBLIC CHAIN PROOF')&&!await has('Independently inspect public transaction'))
  await navigate('ledger');await until(()=>has('BALANCED'),'ledger');await screenshot('ledger-synthetic');check('ledger renders exact 18-decimal fee and per-asset result',await has('0.000000650000000100')&&await has('ETH 0.000000000000000000'))
@@ -91,6 +118,19 @@ try{
  chainMode='LIVE';await navigate('blockchain');await until(()=>has('Independently inspect public transaction'),'live fixture link');check('public explorer link targets supported testnet safely',await ev(`document.querySelector('a[target="_blank"]').href===${JSON.stringify('https://sepolia.basescan.org/tx/'+hash)}`));chainMode='MOCK'
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await ev('location.hash="/overview"');await until(()=>has('Corporate funding accounts'),'mobile');await screenshot('mobile-synthetic');check('mobile layout has no document horizontal overflow',await ev('document.documentElement.scrollWidth<=innerWidth'))
  expire=true;await click('Refresh');await until(()=>has('Sign in with your organization'),'expired session');check('401 clears the entire customer view',!(await has(pay))&&!(await has('100000.00')))
+ expire=false
+ // Pretend a previous user still has a hosted cookie, then exercise secure login.
+ providerUser='synthetic-operator';const beforeLogout=logoutCount
+ await click('Sign in securely');await until(()=>has('SYNTHETIC Cognito sign-in form'),'fresh hosted login')
+ check('secure login clears retained provider session before showing account entry',logoutCount===beforeLogout+1&&providerUser===null)
+ await click('Choose synthetic-approver-a');await until(()=>has('Signed in as demo-approver-a'),'secure first identity')
+ check('secure PKCE callback loads selected approver and removes one-time login data',await ev("!sessionStorage.getItem('stableflow:pkce')&&!sessionStorage.getItem('stableflow:fresh-login')&&!location.search"))
+ await click('Sign out / switch user');await until(()=>has('Sign in with your organization'),'secure logout')
+ check('hosted logout removes old identity and evidence',providerUser===null&&!(await has('Signed in as'))&&!(await has('100000.00')))
+ await click('Sign in securely');await until(()=>has('SYNTHETIC Cognito sign-in form'),'second hosted login')
+ await click('Choose synthetic-approver-b');await until(()=>has('Signed in as demo-approver-b'),'secure second identity')
+ check('second secure login uses a different identity without restoring the previous user',!(await has('Signed in as demo-approver-a'))&&providerUser==='synthetic-approver-b')
+ if(exceptions.length)console.error('SYNTHETIC BROWSER EXCEPTIONS',JSON.stringify(exceptions))
  check('no browser runtime exceptions',exceptions.length===0)
  await writeFile(resolve(artifacts,'browser-results.json'),JSON.stringify({status:'PASSED',completedAt:new Date().toISOString(),synthetic:true,checks:checks.length,passed:checks,liveSystemsExecuted:false},null,2));console.log(`BROWSER CHECKS ${checks.length}/${checks.length}; SYNTHETIC ONLY; screenshots: ${artifacts}`)
 }catch(error){console.error('BROWSER FAILURE',error);await writeFile(resolve(artifacts,'browser-results.json'),JSON.stringify({status:'FAILED',synthetic:true,checks:checks.length,passed:checks,error:String(error)}));process.exitCode=1}finally{fixture.closeAllConnections();if(socket){try{socket.close()}catch{}}if(edge)edge.kill();if(vite)await Promise.race([vite.close(),new Promise(resolve=>setTimeout(resolve,2000))]);fixture.close();setTimeout(()=>process.exit(process.exitCode??0),1000).unref()}

@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {beginLogin,cognitoLogoutUrl,finishLogin,refreshSession,returnRoute} from '../src/lib/auth.ts'
+import {beginLogin,clearPendingLogin,cognitoLogoutUrl,finishLogin,resumeFreshLogin,refreshSession,returnRoute} from '../src/lib/auth.ts'
 import {SessionKeeper} from '../src/lib/session.ts'
 const identity={clientId:'public-client',redirectUri:'https://ui.test/auth/callback',authorizationUri:'https://id.test/oauth2/authorize',tokenUri:'https://id.test/oauth2/token',scopes:'openid profile',autoRefreshEnabled:true}
 class Storage {values=new Map();getItem(k){return this.values.get(k)??null}setItem(k,v){this.values.set(k,v)}removeItem(k){this.values.delete(k)}}
@@ -69,4 +69,56 @@ test('non-Cognito providers and lookalike domains do not receive a guessed sign-
  assert.equal(cognitoLogoutUrl(identity,'https://ui.test'),null)
  for(const authorizationUri of ['https://demo.auth.us-west-2.amazoncognito.com.attacker.test/oauth2/authorize','https://demo.auth.us-west-2.amazoncognito.com/login'])assert.equal(cognitoLogoutUrl({...cognito,authorizationUri},'https://ui.test'),null)
  assert.equal(cognitoLogoutUrl({...cognito,tokenUri:identity.tokenUri},'https://ui.test'),null)
+})
+
+
+test('classic Cognito login clears hosted cookie before authorize and retains PKCE and payment route',async()=>{
+ const storage=new Storage(),route='#/payments/PAY-1/approvals?review=review-1'
+ const first=new URL(await beginLogin(cognito,storage,'https://ui.test',route))
+ assert.equal(first.pathname,'/logout');assert.equal(first.searchParams.get('logout_uri'),'https://ui.test/')
+ assert.equal(first.searchParams.size,2);assert.equal(first.searchParams.has('code_challenge'),false)
+ const authorize=new URL(await resumeFreshLogin(cognito,storage,'https://ui.test','/',''))
+ assert.equal(authorize.pathname,'/oauth2/authorize');assert.equal(authorize.searchParams.get('prompt'),'login')
+ const saved=JSON.parse(storage.getItem('stableflow:pkce'))
+ assert.equal(authorize.searchParams.get('state'),saved.state)
+ assert.equal(authorize.searchParams.get('code_challenge'),Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(saved.verifier))).toString('base64url'))
+ assert.equal(await resumeFreshLogin(cognito,storage,'https://ui.test','/',''),null)
+ const original=globalThis.fetch
+ globalThis.fetch=async(_,options)=>{assert.equal(options.body.get('code_verifier'),saved.verifier);return Response.json({access_token:'different-user',token_type:'Bearer',expires_in:3600})}
+ try{const session=await finishLogin(cognito,'?code=code&state='+saved.state,storage,'https://ui.test');assert.equal(session.returnHash,route);assert.equal(session.token,'different-user');assert.equal(storage.values.size,0)}finally{globalThis.fetch=original}
+})
+
+test('pending fresh login rejects wrong return path, query, configuration, state and malformed or expired data',async()=>{
+ const variants=[
+  {path:'/auth/callback'}, {query:'?return=https://elsewhere.test'}, {config:{...cognito,clientId:'other'}},
+  {change:p=>({...p,state:'wrong'})}, {change:p=>({...p,createdAt:Date.now()-600001})},
+  {change:p=>({...p,createdAt:Date.now()+60000})}, {change:p=>({...p,createdAt:'today'})},
+  {change:p=>({...p,verifier:'bad'})}, {raw:'invalid-json'}, {raw:'null'}
+ ]
+ for(const variant of variants){
+  const storage=new Storage();await beginLogin(cognito,storage,'https://ui.test')
+  if(variant.change)storage.setItem('stableflow:pkce',JSON.stringify(variant.change(JSON.parse(storage.getItem('stableflow:pkce')))))
+  if(variant.raw)storage.setItem('stableflow:pkce',variant.raw)
+  await assert.rejects(resumeFreshLogin(variant.config??cognito,storage,'https://ui.test',variant.path??'/',variant.query??''),/Fresh sign-in could not resume/)
+  assert.equal(storage.values.size,0)
+  assert.equal(await resumeFreshLogin(cognito,storage,'https://ui.test','/',''),null)
+ }
+})
+
+test('explicit signout clears pending login without deleting retained financial command keys',async()=>{
+ const storage=new Storage();storage.setItem('retained-command','keep');await beginLogin(cognito,storage,'https://ui.test')
+ clearPendingLogin(storage)
+ assert.deepEqual([...storage.values],[['retained-command','keep']])
+ assert.equal(await resumeFreshLogin(cognito,storage,'https://ui.test','/',''),null)
+ await assert.rejects(finishLogin(cognito,'?code=old&state=old',storage,'https://ui.test'))
+})
+
+test('starting another login invalidates the previous callback and binds exchange to current config',async()=>{
+ const storage=new Storage();const first=new URL(await beginLogin(identity,storage,'https://ui.test'))
+ const second=new URL(await beginLogin(identity,storage,'https://ui.test'))
+ assert.notEqual(first.searchParams.get('state'),second.searchParams.get('state'))
+ await assert.rejects(finishLogin(identity,'?code=old&state='+first.searchParams.get('state'),storage,'https://ui.test'))
+ await beginLogin(identity,storage,'https://ui.test');const pending=JSON.parse(storage.getItem('stableflow:pkce'))
+ await assert.rejects(finishLogin({...identity,clientId:'other'},'?code=code&state='+pending.state,storage,'https://ui.test'))
+ assert.equal(storage.values.size,0)
 })

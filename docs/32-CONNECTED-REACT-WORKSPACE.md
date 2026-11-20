@@ -254,3 +254,66 @@ and the final unrestricted browser regression passed all 23 checks, including
 two independent approvers, one execution request, refresh and authorization loss.
 All browser evidence is synthetic. These checks do not establish live Cognito
 renewal, a real runtime model call or public-testnet settlement.
+
+## Signed-in account identification - 2026-11-20
+
+The header shows the current username directly below Sign out / switch user,
+followed by server-assigned roles. The existing workbench endpoint returns
+actorUsername from the resource-server-validated JWT username claim only after
+customer membership authorization. Missing, blank, control-containing, non-string
+or overlong claims fall back to the authenticated subject. Older API responses
+also fall back to actorId in the frontend. No username is inferred from request
+headers or a browser-decoded token; identity text never grants permissions.
+The header shows Verifying identity until the catalog loads and is removed when
+the session clears. Long names wrap; the label uses React text escaping.
+
+This increment is held locally for batch publication at the owner's request.
+Codespaces visual and live username acceptance remain pending publication.
+
+Local validation: TypeScript/Vite build and lint passed; 26 frontend tests,
+7 WorkbenchControllerTest cases and 26 synthetic headless browser checks passed.
+The browser rehearsal verified header placement, roles, sign-out removal and
+mobile overflow; its generated mobile screenshot was visually inspected.
+These checks do not constitute live Cognito or Codespaces acceptance.
+No architecture or authorization policy changed.
+
+
+### Fresh Cognito sign-in after sign-out - 2026-11-20
+
+The Oregon demo domain was created with classic hosted UI (managed login version 1).
+AWS documents that `prompt=login` is supported only by managed login, not classic
+hosted UI. Consequently this parameter alone cannot require fresh credentials.
+The existing explicit sign-out already visits the configured Cognito `/logout`
+endpoint after clearing application state and cancelling renewal.
+
+Secure sign-in now also visits that logout endpoint before authorization, clearing
+a retained hosted session even if an earlier sign-out was interrupted. It returns
+to the registered application root, consumes a one-time pending-login marker and
+continues at `/oauth2/authorize` with the original S256 PKCE challenge and state.
+The marker is bound to the configured client/endpoints, expires after ten minutes
+and cannot supply an arbitrary redirect. No PKCE parameters are sent to `/logout`.
+No additional AWS resources or AWS CLI credentials are needed for browser sign-in.
+The configured client must still list the exact UI root in Allowed sign-out URLs
+and `/auth/callback` in Allowed callback URLs. Unsupported identity domains keep
+the existing provider-specific fallback; no external logout endpoint is guessed.
+
+Explicit sign-out removes pending login data while preserving customer-scoped
+financial idempotency keys. Tokens remain in memory and API membership/roles remain
+authoritative. Hosted logout does not claim to revoke already issued bearer tokens
+or end sessions at external social/OIDC identity providers. No architecture change.
+
+Source: [AWS authorization endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html)
+and [AWS logout endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html).
+
+Acceptance after the approved publication batch: sign in as demo-a-operator, sign
+out, use secure sign-in and verify that a credential form is shown; sign in as
+demo-a-approver-one and confirm the server-verified username and roles changed.
+Repeat with demo-a-approver-two. A synthetic provider rehearsal is not live Cognito
+acceptance. This change is included with the signed-in username display in the
+approved publication batch. Live Codespaces acceptance remains pending.
+
+Local validation for this change: TypeScript/Vite build and lint passed without
+warnings; 30 frontend unit tests and 30 synthetic headless browser checks passed.
+The browser fixture deliberately models classic hosted UI ignoring prompt=login,
+then verifies logout-before-login, preserved PKCE, cleared customer evidence and
+two different secure-login identities. No live AWS sign-in was executed.
