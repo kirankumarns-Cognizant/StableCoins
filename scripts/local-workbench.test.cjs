@@ -119,3 +119,11 @@ test('failure diagnostics flag is accepted for startup and verification without 
   assert.deepEqual(validationArguments(['verify']),{action:'verify',showFailures:false});
   for(const args of [['doctor','--show-failures'],['smoke','--show-failures'],['start','--require-database'],['verify','--unknown']])assert.throws(()=>validationArguments(args),/Usage/);
 });
+
+
+test('process runner separates Docker-style stderr warnings from JSON stdout',async()=>{
+ const {run}=require('./local-workbench.cjs');
+ const result=await run(process.execPath,['-e','process.stderr.write("WARN[0000] version is obsolete\\n");process.stdout.write(JSON.stringify({Service:"postgres",State:"running",Health:"healthy"}))']);
+ assert.equal(result.code,0);assert.equal(JSON.parse(result.stdout).Service,'postgres');
+ assert.match(result.stderr,/version is obsolete/);assert.match(result.output,/version is obsolete/);
+});

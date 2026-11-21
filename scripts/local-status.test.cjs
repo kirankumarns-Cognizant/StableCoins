@@ -101,3 +101,22 @@ test('status refuses external service origins before Docker or HTTP access',asyn
   execute:async()=>{calls++;},fetcher:async()=>{calls++;}});
  assert.equal(report.status,'FAILED');assert.equal(exitCode,2);assert.equal(calls,0);assert.ok(!lines.includes('private-value'));
 });
+
+
+test('Compose stderr version warning cannot contaminate valid newline JSON inventory',async()=>{
+ const warning='WARN[0000] docker-compose.yml: the attribute version is obsolete, it will be ignored\n';
+ const stdout=inventory().map(row=>JSON.stringify(row)).join('\n');
+ const result=await stackStatus({config:readConnections({}),execute:async()=>({code:0,stdout,stderr:warning,output:warning+stdout}),smoke,fetcher:fetcher()});
+ assert.equal(result.status,'PASSED');assert.equal(result.components.length,9);
+ assert.ok(result.components.every(row=>row.status==='PASSED'));
+});
+test('inventory failure details retain sanitized command cause, exit status and timeout',async t=>{
+ for(const result of [{code:1,stderr:'permission denied password=dummy-inventory-secret',output:''},
+   {code:1,timedOut:true,stderr:'',output:''}, {code:0,stdout:'invalid token=dummy-inventory-secret',stderr:'',output:''}]){
+  const {report,lines}=await invoke(t,['status','--show-failures'],{config:readConnections({}),
+    execute:async()=>result,fetcher:fetcher()});
+  assert.equal(report.status,'FAILED');assert.match(lines,/Failure details: compose:inventory/);
+  assert.match(lines,result.code===0?/CONTAINER_JSON_INVALID/:result.timedOut?/CONTAINER_COMMAND_TIMEOUT/:/permission denied/);
+  assert.ok(!JSON.stringify(report).includes('dummy-inventory-secret'));assert.ok(!lines.includes('dummy-inventory-secret'));
+ }
+});

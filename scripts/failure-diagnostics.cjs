@@ -36,7 +36,7 @@ function readTail(file,boundary,since=0) {
 }
 async function collectServiceDiagnostics(report,directory,execute) {
   if(!['start','status'].includes(report.action) || report.status!=='FAILED')return null;
-  const names=[...new Set([...(report.containers || []),...(report.components || [])].filter(item=>item.status==='FAILED' && services.has(item.name)).map(item=>item.name))];
+  const names=[...new Set([...(report.containers || []),...(report.components || [])].filter(item=>item.status==='FAILED' && item.reason!=='CONTAINER_STATUS_UNAVAILABLE' && services.has(item.name)).map(item=>item.name))];
   if(!names.length)return null;
   try {
     const result=await execute('docker',['compose','--profile','services','logs','--no-color','--tail','80',...names],{timeoutMs:15000});
@@ -58,6 +58,12 @@ function failureDetails(report,{root,directory,environment=process.env}) {
   }
   if(report.diagnostics?.log)sources.push({name:'failed services',file:report.diagnostics.log,boundary:directory});
   const messages=['CLI failure details (bounded, redacted excerpts):'];let shown=0;
+  for(const check of report.checks || [])if(check.status==='FAILED' && check.diagnostic){
+    const diagnostic=check.diagnostic;
+    messages.push('Failure details: '+check.name+' | '+diagnostic.cause+' | exit='+diagnostic.exitCode+' | timeout='+diagnostic.timedOut,
+      ...redact(diagnostic.message,environment).split(/\r?\n/).slice(0,8).map(line=>'  '+line.slice(0,500)));
+    shown++;
+  }
   for(const source of sources) {
     if(shown===6){messages.push('Additional details omitted; inspect the diagnostic files locally.');break;}
     const text=readTail(resolve(source.file),source.boundary,source.since);

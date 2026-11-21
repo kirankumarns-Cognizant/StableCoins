@@ -540,3 +540,12 @@ This command does not validate Cognito sign-in, payment completion, model
 inference, public port forwarding or real blockchain transactions. The existing
 `smoke` command remains backend-only. Neither command starts or repairs the stack;
 use `start --show-failures` separately when startup is needed.
+
+
+Docker inventory parsing keeps stdout separate from stderr, including Compose's
+obsolete-version warning. A warning does not turn valid container JSON into a
+failed inventory check. With --show-failures, command failure reports include
+a bounded redacted error, exit code and timeout indicator; invalid JSON has a
+separate diagnostic cause without printing container metadata. Unknown container
+state alone does not trigger log collection from every service. Successful HTTP
+probes remain visible even if Docker inventory cannot be inspected.

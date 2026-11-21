@@ -27,20 +27,22 @@ function run(executable, args, options = {}) {
   }
   const spec = command(executable,args);
   return new Promise(resolveRun => {
-    let output = '';
+    let output = '', stdout = '', stderr = '';
     const child = spawn(spec.executable,spec.args,{cwd:root,env:options.env || process.env,windowsHide:true,windowsVerbatimArguments:spec.windowsVerbatimArguments,
       stdio:options.log && !options.onOutput ? ['ignore',options.log,options.log] : ['ignore','pipe','pipe']});
-    const receive=chunk=>{
+    const receive=(chunk,stream)=>{
+      if(stream==='stdout')stdout=(stdout+chunk).slice(0,262144);
+      else stderr=(stderr+chunk).slice(0,65536);
       if(options.log && options.onOutput)writeSync(options.log,chunk);
       if(output.length<32000)output+=chunk;
       options.onOutput?.(chunk);
     };
-    child.stdout?.on('data',receive);
-    child.stderr?.on('data',receive);
+    child.stdout?.on('data',chunk=>receive(chunk,'stdout'));
+    child.stderr?.on('data',chunk=>receive(chunk,'stderr'));
     let timedOut = false;
     const timer = setTimeout(() => {timedOut = true; child.kill();}, options.timeoutMs || 30000);
-    child.on('error',() => {clearTimeout(timer); resolveRun({code:127,output:'',timedOut:false});});
-    child.on('close',code => {clearTimeout(timer); resolveRun({code:code ?? 1,output,timedOut});});
+    child.on('error',() => {clearTimeout(timer); resolveRun({code:127,output:'',stdout:'',stderr:'',timedOut:false});});
+    child.on('close',code => {clearTimeout(timer); resolveRun({code:code ?? 1,output,stdout,stderr,timedOut});});
   });
 }
 function verificationEnvironment(parent=process.env) {
@@ -242,7 +244,7 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       try {
         if(inventory.code!==0)throw Error('Container status unavailable');
         const attempted=new Set(report.checks.filter(check=>check.name.startsWith('compose:')).map(check=>check.name.slice('compose:'.length)));
-        report.containers=containerChecks(inventory.output).filter(check=>attempted.has(check.name));
+        report.containers=containerChecks(inventory.stdout ?? inventory.output).filter(check=>attempted.has(check.name));
         for(const check of report.containers) {
           // A still-running old image cannot erase a failed build/start attempt.
           if(check.status==='PASSED' && tracker.snapshot().some(item=>item.name===check.name && item.status==='FAILED'))continue;
@@ -296,5 +298,5 @@ async function main(args=process.argv.slice(2),dependencies={}) {
   for(const message of startupMessages(report))console.log(message);
   return report;
 }
-module.exports={requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,validationArguments,main};
+module.exports={run,requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,validationArguments,main};
 if(require.main===module)main().catch(()=>{console.error('Local validation could not start');process.exitCode=2;});
