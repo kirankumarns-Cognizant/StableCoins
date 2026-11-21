@@ -5,6 +5,7 @@ const {mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, writeSync,
 const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
+const {stackStatus} = require('./local-status.cjs');
 const {startBackends} = require('./sequential-startup.cjs');
 const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker} = require('./startup-status.cjs');
 const {redact,collectServiceDiagnostics,failureDetails}=require('./failure-diagnostics.cjs');
@@ -148,11 +149,11 @@ function startupMessages(report, environment=process.env, config) {
 }
 function validationArguments(args) {
   const action=args[0] || 'doctor',options=args.slice(1);
-  const allowed={doctor:[],smoke:[],start:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
-  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|start [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
+  const allowed={doctor:[],smoke:[],status:['--show-failures'],start:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
+  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|status [--show-failures]|start [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
   return {action,showFailures:options.includes('--show-failures')};
 }
-async function main(args=process.argv.slice(2)) {
+async function main(args=process.argv.slice(2),dependencies={}) {
   const {action,showFailures}=validationArguments(args);
   const directory=join(root,'.local','validation',`${Date.now()}-${process.pid}-${action}`);
   mkdirSync(directory,{recursive:true});
@@ -168,6 +169,17 @@ async function main(args=process.argv.slice(2)) {
   if(action==='start')console.log('Startup status: STARTING. Checking prerequisites, backend containers, API access and frontend readiness.');
   if(verification)console.log(verification.summary()+' (check-based; not elapsed time or payment acceptance)');
   try {
+    if(action==='status') {
+      console.log('Checking existing stack only; no build, start, restart or payment commands.');
+      const config=dependencies.config || readConnections();
+      // Reject external or credential-bearing service origins before inspecting anything.
+      for(const name of services)localUrl(config[destinations[name]]);
+      Object.assign(report,await stackStatus({config,execute:dependencies.execute || run,smoke,fetcher:dependencies.fetcher || fetch,
+        onCheck:check=>{report.checks.push(check);save();console.log('['+check.status+'] '+check.name+' | '+(check.reason || (check.httpStatus!==undefined?'HTTP '+check.httpStatus:'CHECKED')));}}));
+      for(const component of report.components)console.log('['+component.status+'] '+component.name+' | '+component.reason);
+      const ready=report.components.filter(component=>component.status==='PASSED').length;
+      console.log('Stack status: '+(report.status==='PASSED'?'READY':'NOT_READY')+' | Components: '+ready+'/9 ready, '+(9-ready)+' failed or unavailable');
+    }
     if(action==='doctor' || action==='verify' || action==='start') {
       report.prerequisites=tracker || verification?await startupStage('prerequisites',async()=>{
         const prerequisites=await doctor();
@@ -268,19 +280,19 @@ async function main(args=process.argv.slice(2)) {
         report.scope='LOCAL_FRONTEND_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
       }
     }
-  } catch(error) {report.status='FAILED';report.reason=error.message;if(verification)verification.update(activeVerification,'FAILED');}
+  } catch(error) {report.status='FAILED';report.reason=action==='status'?'Status check could not complete; verify local connection settings':error.message;if(verification)verification.update(activeVerification,'FAILED');}
   if(tracker){report.components=tracker.snapshot();console.log(tracker.summary());}
   if(verification)console.log(verification.summary());
   if(showFailures && report.status==='FAILED'){
     console.log('Collecting CLI failure diagnostics...');
-    report.diagnostics=await collectServiceDiagnostics(report,directory,run);
+    report.diagnostics=await collectServiceDiagnostics(report,directory,action==='status'?(dependencies.execute || run):run);
   }
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
   for(const message of failureMessages(report))console.error(redact(message));
   if(showFailures)for(const message of failureDetails(report,{root,directory}))console.error(message);
-  if(report.status==='FAILED' && !showFailures && ['start','verify'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
+  if(report.status==='FAILED' && !showFailures && ['start','verify','status'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
   for(const message of startupMessages(report))console.log(message);
   return report;
 }

@@ -35,7 +35,7 @@ function readTail(file,boundary,since=0) {
   } catch {return null;} finally {if(fd!==undefined)closeSync(fd);}
 }
 async function collectServiceDiagnostics(report,directory,execute) {
-  if(report.action!=='start' || report.status!=='FAILED')return null;
+  if(!['start','status'].includes(report.action) || report.status!=='FAILED')return null;
   const names=[...new Set([...(report.containers || []),...(report.components || [])].filter(item=>item.status==='FAILED' && services.has(item.name)).map(item=>item.name))];
   if(!names.length)return null;
   try {
@@ -47,7 +47,7 @@ async function collectServiceDiagnostics(report,directory,execute) {
   } catch {return {status:'UNAVAILABLE',reason:'FAILED_SERVICE_LOGS_UNAVAILABLE'};}
 }
 function failureDetails(report,{root,directory,environment=process.env}) {
-  if(!['start','verify'].includes(report.action) || report.status!=='FAILED')return [];
+  if(!['start','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
   const sources=(report.checks || []).filter(check=>check.status==='FAILED' && check.log).map(check=>({name:check.name,file:check.log,boundary:directory}));
   // Fresh failed test reports usually contain the assertions omitted from Maven's final summary.
   for(const suite of report.java?.suites || [])if((suite.failures || suite.errors) && (services.has(suite.module) || ['platform-flow','platform-security'].includes(suite.module)) && /^[\w$]+(?:\.[\w$]+)+$/.test(suite.name)) {

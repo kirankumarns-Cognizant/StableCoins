@@ -96,6 +96,8 @@ print, replace or create credentials.
 node --env-file=.env scripts/local-workbench.cjs start
 # Repeat only the read-only health/access probes for an already running stack.
 node --env-file=.env scripts/local-workbench.cjs smoke
+# Inspect containers, all backend boundaries, and the frontend/API proxy without starting them.
+node --env-file=.env scripts/local-workbench.cjs status --show-failures
 ```
 
 `start` first requires a reachable Docker server and Compose, then invokes the
@@ -515,3 +517,26 @@ retains customer policies/passwords/callback/TTLs and keeps the routing agent of
 Restart and perform fresh Oregon sign-in before connected payment testing.
 See [the cutover evidence and outstanding gates](34-CODESPACES-DEMO-LAUNCH.md#oregon-migration-and-cutover-2026-11-17).
 Startup health success does not prove real AWS secret access or Cognito login.
+
+## Read-only running-stack status (2026-11-21)
+
+`node --env-file=.env scripts/local-workbench.cjs status` inspects the eight existing
+Compose containers, runs the 18 backend health/access probes, and checks the React
+development marker, application HTML and anonymous API proxy denial. It does not
+require Java/build dependencies to inspect an already running application, and
+never builds, starts, restarts, seeds or changes application resources. Only local
+HTTP service origins are accepted. A timestamped `.local/validation/.../report.json`
+records the snapshot; it is not continuous monitoring.
+
+The summary reports nine components ready or failed/unavailable. A healthy Docker
+container cannot hide a failed API probe or a frontend proxy returning 502.
+Unavailable Docker inventory is reported as unavailable, not as evidence that
+containers are stopped. All checks must pass for exit code 0; failures return 2.
+Add `--show-failures` for bounded redacted logs from allowlisted failed containers.
+Logs cannot always identify a root cause; frontend/proxy failures still retain
+their failure classification. No environment dump or raw Docker output is saved.
+
+This command does not validate Cognito sign-in, payment completion, model
+inference, public port forwarding or real blockchain transactions. The existing
+`smoke` command remains backend-only. Neither command starts or repairs the stack;
+use `start --show-failures` separately when startup is needed.

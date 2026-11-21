@@ -78,8 +78,9 @@ async function startupStage(name,task,{write=console.log,intervalMs=15000,progre
 }
 
 function failureMessages(report) {
-  if(!['start','verify'].includes(report.action) || report.status!=='FAILED')return [];
-  const lines=[report.action==='start'?'Startup status: FAILED':'Verification status: FAILED'];
+  if(!['start','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
+  const label={start:'Startup',verify:'Verification',status:'Stack'}[report.action];
+  const lines=[label+' status: FAILED'];
   for(const [name,ready] of Object.entries(report.prerequisites || {}))if(!ready)lines.push(`Failed component: prerequisite:${name} | Reason: MISSING_OR_UNAVAILABLE`);
   for(const check of [...(report.checks || []),...(report.containers || [])])if(check.status==='FAILED') {
     lines.push(`Failed component: ${check.name} | Reason: ${check.reason || (check.httpStatus!==undefined?'UNEXPECTED_HTTP_'+check.httpStatus:check.exitCode!==undefined?'EXIT_CODE_'+check.exitCode:'READINESS_CHECK_FAILED')}${check.exitCode!==undefined?' | Exit code: '+check.exitCode:''}`);
@@ -87,7 +88,7 @@ function failureMessages(report) {
   }
   for(const suite of report.java?.suites || [])if(suite.failures || suite.errors)lines.push(`Failed test suite: ${suite.name} | Failures: ${suite.failures} | Errors: ${suite.errors}`);
   if(report.databaseGate==='NOT_SATISFIED')lines.push('Database gate: NOT_SATISFIED; required integration evidence is missing, failed or skipped.');
-  if(report.reason)lines.push(`${report.action==='start'?'Startup':'Verification'} reason: ${report.reason}`);
+  if(report.reason)lines.push(`${label} reason: ${report.reason}`);
   if(report.containerDiagnostics==='UNAVAILABLE')lines.push('Container status unavailable; inspect compose.log for the build/start failure.');
   const pending=(report.components || []).filter(component=>component.status==='PENDING').map(component=>component.name);
   if(pending.length)lines.push('Pending / not verified: '+pending.join(', '));
