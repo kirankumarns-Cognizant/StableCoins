@@ -748,3 +748,49 @@ warnings; 30 frontend unit tests and 30 synthetic headless browser checks passed
 The browser fixture deliberately models classic hosted UI ignoring prompt=login,
 then verifies logout-before-login, preserved PKCE, cleared customer evidence and
 two different secure-login identities. No live AWS sign-in was executed.
+
+
+## Persist demo execution configuration (2026-11-21)
+
+Terminal commands and a private Codespaces .env are not deployed to AWS by Git.
+The three non-secret execution gates now have a committed demo profile at
+services/config/demo-execution.json. With an existing configured .env, run once:
+
+```bash
+node scripts/configure-demo-execution.cjs
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+node --env-file=.env scripts/local-workbench.cjs status --show-failures
+```
+
+Setup changes only PAYMENT_FLOW_ENABLED, PAYMENT_EXECUTION_ENABLED and
+BLOCKCHAIN_EXECUTION_API_ENABLED to true, replacing duplicate assignments.
+It preserves credentials, customer memberships, provider and blockchain settings.
+Repeated runs are idempotent; .env persists on ordinary stop/start of the same
+Codespace. Reapply on a new Codespace after configuring its private .env. Existing
+exported shell variables take precedence over Node --env-file and Compose .env;
+clear stale exports for these three gates before restarting. Generic defaults
+remain off. Setup never starts services or submits a transaction. Application
+startup recreates containers when their environment changes; restarting unchanged
+containers alone does not apply a changed environment. Do not delete volumes.
+
+This does not enable AI or select TESTNET. Existing identity, customer policy,
+independent approvals, quote expiry and wallet readiness remain enforced. The
+base Compose stack remains MOCK/testnet-off. Expired review versions require
+fresh preparation and approvals.
+
+For AWS, export the same three non-secret settings in ECS container environment
+format without reading or writing .env:
+
+```bash
+node scripts/configure-demo-execution.cjs --ecs-environment
+```
+
+Supply these entries to each relevant service container when implementing its
+ECS task definition. This export is configuration material, not a deployment.
+The current infrastructure/lib/infrastructure-stack.ts provisions EventBridge
+and SQS resources; it has no ECS application task definitions. Automated ECS
+configuration and rollout therefore remain unimplemented. AWS additionally needs
+the existing identity/customer policy configuration, service networking, Aurora,
+task-role permissions, Secrets Manager references and deliberate blockchain-mode
+configuration. Never copy local .env secrets, LocalStack test credentials, or
+LOCAL_SCHEMA_BOOTSTRAP into an AWS task definition.
