@@ -2,12 +2,12 @@
 const {startupStage}=require('./startup-status.cjs');
 const backendOrder=Object.freeze(['postgres','localstack','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator']);
 
-async function startBackends({execute,tracker,waitSeconds,log,onCheck=()=>{},stageOptions={}}) {
+async function startBackends({execute,tracker,waitSeconds,log,onCheck=()=>{},stageOptions={},restart=false}) {
   for(const [index,name] of backendOrder.entries()) {
-    const args=['compose','--profile','services','up','-d','--no-deps',...(index<2?[]:['--build']),'--wait','--wait-timeout',String(waitSeconds),name];
+    const args=['compose','--profile','services','up','-d','--no-deps',...(index<2?[]:['--build',...(restart?['--force-recreate']:[])]),'--wait','--wait-timeout',String(waitSeconds),name];
     let result;
     try {
-      result=await startupStage(name+': '+(index<2?'start and health check':'build, start and health check'),async()=>{
+      result=await startupStage(name+': '+(index<2?'start and health check':restart?'build, recreate and health check':'build, start and health check'),async()=>{
         const outcome=await execute('docker',args,{log,timeoutMs:1800000});
         tracker.update(name,outcome.code===0?'STARTED':'FAILED',outcome.code===0?'Compose health check passed':outcome.timedOut?'COMMAND_TIMEOUT':'BUILD_OR_CONTAINER_READINESS_FAILED');
         return outcome;

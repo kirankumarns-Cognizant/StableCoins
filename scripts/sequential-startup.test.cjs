@@ -51,3 +51,25 @@ test('a command exception becomes a safe component failure without leaking excep
   assert.equal(ctx.tracker.snapshot()[0].status,'FAILED');
   assert.ok(!JSON.stringify({lines:ctx.lines,checks:ctx.checks}).includes('credential'));
 });
+
+
+test('restart rebuilds and recreates only the six backends, preserves infrastructure and waits sequentially',async()=>{
+ const calls=[];const ctx=context(async(exe,args)=>{calls.push(args);return {code:0};});
+ await startBackends({...ctx,restart:true});
+ assert.deepEqual(calls.map(args=>args.at(-1)),backendOrder);
+ for(const [index,args] of calls.entries()) {
+  assert.equal(args.includes('--force-recreate'),index>=2);
+  assert.equal(args.includes('--build'),index>=2);
+  assert.ok(args.includes('--wait') && args.includes('--no-deps'));
+  assert.ok(!args.some(arg=>['down','rm','--volumes','-v','restart'].includes(arg)));
+ }
+ assert.ok(ctx.lines.some(line=>line.includes('build, recreate and health check')));
+});
+
+test('restart stops on rebuild failure without replacing later services',async()=>{
+ const calls=[];const ctx=context(async(exe,args)=>{calls.push(args);return {code:calls.length===4?1:0};});
+ assert.equal((await startBackends({...ctx,restart:true})).code,1);
+ assert.deepEqual(calls.map(args=>args.at(-1)),backendOrder.slice(0,4));
+ assert.equal(ctx.tracker.snapshot()[3].status,'FAILED');
+ assert.ok(ctx.tracker.snapshot().slice(4).every(item=>item.status==='PENDING'));
+});

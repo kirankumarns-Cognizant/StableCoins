@@ -78,8 +78,8 @@ async function startupStage(name,task,{write=console.log,intervalMs=15000,progre
 }
 
 function failureMessages(report) {
-  if(!['start','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
-  const label={start:'Startup',verify:'Verification',status:'Stack'}[report.action];
+  if(!['start','restart','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
+  const label={start:'Startup',restart:'Restart',verify:'Verification',status:'Stack'}[report.action];
   const lines=[label+' status: FAILED'];
   for(const [name,ready] of Object.entries(report.prerequisites || {}))if(!ready)lines.push(`Failed component: prerequisite:${name} | Reason: MISSING_OR_UNAVAILABLE`);
   for(const check of [...(report.checks || []),...(report.containers || [])])if(check.status==='FAILED') {
@@ -92,7 +92,7 @@ function failureMessages(report) {
   if(report.containerDiagnostics==='UNAVAILABLE')lines.push('Container status unavailable; inspect compose.log for the build/start failure.');
   const pending=(report.components || []).filter(component=>component.status==='PENDING').map(component=>component.name);
   if(pending.length)lines.push('Pending / not verified: '+pending.join(', '));
-  if(report.action==='start')lines.push('Application readiness was not established. Existing data volumes were retained.');
+  if(['start','restart'].includes(report.action))lines.push('Application readiness was not established. Existing data volumes were retained.');
   return lines;
 }
 module.exports={containerChecks,startupStage,failureMessages,startupTracker,verificationTracker};

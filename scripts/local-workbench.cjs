@@ -129,7 +129,7 @@ async function smoke(config=readConnections(), fetcher=fetch, onCheck=()=>{}) {
   return checks;
 }
 function startupMessages(report, environment=process.env, config) {
-  if(report.action!=='start' || report.status!=='PASSED') return [];
+  if(!['start','restart'].includes(report.action) || report.status!=='PASSED') return [];
   config=config || readConnections(environment);
   const name=environment.CODESPACE_NAME,domain=environment.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
   const forwarded=typeof name==='string' && /^[a-z0-9-]+$/i.test(name) && typeof domain==='string' && /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(domain);
@@ -140,8 +140,8 @@ function startupMessages(report, environment=process.env, config) {
     return `${labels[service]} health URL: ${forwarded?origin(target.port || 80):target.origin}/health`;
   });
   return [
-    'Startup status: STARTED',
-    'Server startup completed. You can access the application now. React and all six backend services are ready; access checks passed.',
+    report.action==='restart'?'Restart status: RESTARTED':'Startup status: STARTED',
+    (report.action==='restart'?'Backend restart completed.':'Server startup completed.')+' You can access the application now. React and all six backend services are ready; access checks passed.',
     `Application URL: ${origin(5173)}/`,
     'Backend health URLs (diagnostics only; use the Application URL for the demo):',
     ...healthUrls,
@@ -151,26 +151,30 @@ function startupMessages(report, environment=process.env, config) {
 }
 function validationArguments(args) {
   const action=args[0] || 'doctor',options=args.slice(1);
-  const allowed={doctor:[],smoke:[],status:['--show-failures'],start:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
-  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|status [--show-failures]|start [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
+  const allowed={doctor:[],smoke:[],status:['--show-failures'],start:['--show-failures'],restart:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
+  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|status [--show-failures]|start|restart [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
   return {action,showFailures:options.includes('--show-failures')};
 }
 async function main(args=process.argv.slice(2),dependencies={}) {
   const {action,showFailures}=validationArguments(args);
+  const starting=['start','restart'].includes(action);
+  const execute=dependencies.execute || run;
   const directory=join(root,'.local','validation',`${Date.now()}-${process.pid}-${action}`);
   mkdirSync(directory,{recursive:true});
   const file=join(directory,'report.json');
   const report={action,startedAt:new Date().toISOString(),status:'RUNNING',scope:'LOCAL_ONLY',liveAcceptance:false,checks:[]};
-  const tracker=action==='start'?startupTracker():null;
+  const tracker=starting?startupTracker():null;
   const verification=action==='verify'?verificationTracker():null;
   let activeVerification='prerequisites';
   const stageOptions={progress:()=> (tracker || verification).progress()};
   const componentFor=name=>({payment:'payment-service','compliance-quote':'compliance-quote-service',blockchain:'blockchain-service',ledger:'settlement-ledger-service',reconciliation:'reconciliation-service',visa:'visa-simulator'})[name];
   const save=()=>{if(tracker || verification)report.progress=(tracker || verification).progress();writeFileSync(file,JSON.stringify(report,null,2)+'\n','utf8');};save();
   console.log(`Local ${action}; report: ${file}`);
-  if(action==='start')console.log('Startup status: STARTING. Checking prerequisites, backend containers, API access and frontend readiness.');
+  if(starting)console.log((action==='restart'?'Restart':'Startup')+' status: STARTING. Checking prerequisites, backend containers, API access and frontend readiness.');
+  if(action==='restart')console.log('Rebuild and recreate all six backends; retain PostgreSQL/LocalStack and data volumes. Reuse a healthy React dev server.');
   if(verification)console.log(verification.summary()+' (check-based; not elapsed time or payment acceptance)');
   try {
+    const config=dependencies.config || (starting?readConnections():undefined);
     if(action==='status') {
       console.log('Checking existing stack only; no build, start, restart or payment commands.');
       const config=dependencies.config || readConnections();
@@ -182,12 +186,12 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       const ready=report.components.filter(component=>component.status==='PASSED').length;
       console.log('Stack status: '+(report.status==='PASSED'?'READY':'NOT_READY')+' | Components: '+ready+'/9 ready, '+(9-ready)+' failed or unavailable');
     }
-    if(action==='doctor' || action==='verify' || action==='start') {
+    if(action==='doctor' || action==='verify' || starting) {
       report.prerequisites=tracker || verification?await startupStage('prerequisites',async()=>{
-        const prerequisites=await doctor();
+        const prerequisites=await (dependencies.doctor || doctor)(execute);
         const ready=verification?prerequisites.node && prerequisites.java21 && prerequisites.dependencies && (!args.includes('--require-database') || prerequisites.docker && prerequisites.compose):Object.values(prerequisites).every(Boolean);
         return {status:ready?'PASSED':'FAILED',prerequisites};
-      },{...stageOptions,successStatus:verification?'CHECKED':'STARTED'}).then(result=>result.prerequisites):await doctor();
+      },{...stageOptions,successStatus:verification?'CHECKED':'STARTED'}).then(result=>result.prerequisites):await (dependencies.doctor || doctor)(execute);
       console.log('Prerequisites:',JSON.stringify(report.prerequisites));
     }
     if(action==='doctor') report.status=Object.values(report.prerequisites).every(Boolean)?'READY':'BLOCKED';
@@ -227,20 +231,20 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       verification.update('java-evidence','PASSED');
       report.status=report.java.totals.skipped?'PASSED_WITH_SKIPS':'PASSED';
     }
-    if(action==='start') {
+    if(starting) {
       if(!Object.values(report.prerequisites).every(Boolean))throw Error('Startup prerequisites missing; see report. No installation or AWS deployment attempted');
-      const waitSeconds=Number(readConnections()['local.validation.compose-wait-seconds']);
+      const waitSeconds=Number(config['local.validation.compose-wait-seconds']);
       if(!Number.isSafeInteger(waitSeconds) || waitSeconds<60 || waitSeconds>1200)throw Error('Invalid local Compose startup timeout');
       // Compose defaults keep MOCK/testnet-off. Existing owner migrations and queue initialization are authoritative.
       const logPath=join(directory,'compose.log'),log=openSync(logPath,'w');
       console.log(`Backend build/start log: ${logPath}`);
       console.log(tracker.summary());
       console.log('Startup order: PostgreSQL > LocalStack > payment > compliance/quote > blockchain > ledger > reconciliation > Visa simulator > React');
-      let result;try{result=await startBackends({execute:run,tracker,waitSeconds,log,stageOptions,onCheck:check=>{
+      let result;try{result=await startBackends({execute,restart:action==='restart',tracker,waitSeconds,log,stageOptions,onCheck:check=>{
         report.checks.push({...check,log:logPath});save();
       }});}finally{closeSync(log);}
       report.checks.push({name:'compose-start',status:result.code===0?'PASSED':'FAILED',exitCode:result.code,reason:result.timedOut?'COMMAND_TIMEOUT':result.code===0?undefined:'BUILD_OR_CONTAINER_READINESS_FAILED',log:logPath});save();
-      const inventory=await run('docker',['compose','--profile','services','ps','--all','--format','json'],{timeoutMs:10000});
+      const inventory=await execute('docker',['compose','--profile','services','ps','--all','--format','json'],{timeoutMs:10000});
       try {
         if(inventory.code!==0)throw Error('Container status unavailable');
         const attempted=new Set(report.checks.filter(check=>check.name.startsWith('compose:')).map(check=>check.name.slice('compose:'.length)));
@@ -256,9 +260,9 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       if(report.containers?.some(check=>check.status==='FAILED'))throw Error('A container is no longer ready after Compose startup; inspect compose.log and the component status');
       if(!report.containers)for(const component of tracker.snapshot().filter(component=>component.name!=='react-frontend'))tracker.update(component.name,'STARTED','Compose readiness passed; detailed status snapshot unavailable');
     }
-    if(action==='smoke' || action==='start') {
-      const checks=action==='start'?await startupStage('backend API health and access checks',async()=>{
-        const checks=await smoke(readConnections(),fetch,check=>{
+    if(action==='smoke' || starting) {
+      const checks=starting?await startupStage('backend API health and access checks',async()=>{
+        const checks=await smoke(config,dependencies.fetcher || fetch,check=>{
           console.log(`[${check.status==='PASSED'?'READY':'FAILED'}] ${check.name}${check.httpStatus!==undefined?' | HTTP '+check.httpStatus:' | '+check.reason}`);
           if(check.status==='FAILED')tracker.update(componentFor(check.name.split(':')[0]),'FAILED',check.name+' '+(check.reason || 'HTTP '+check.httpStatus));
         });
@@ -267,12 +271,11 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       report.checks.push(...checks);
       report.status=report.checks.every(check=>check.status==='PASSED')?'PASSED':'FAILED';
       report.scope='LOCAL_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
-      if(action==='start' && report.status==='PASSED') {
-        const config=readConnections();
+      if(starting && report.status==='PASSED') {
         const frontendLog=join(directory,'frontend.log');
         console.log(`Frontend diagnostic log: ${frontendLog}`);
         try {
-          report.checks.push(await startupStage('React frontend and API proxy',()=>startFrontend({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])}),stageOptions));
+          report.checks.push(await startupStage('React frontend and API proxy',()=>(dependencies.startFrontend || startFrontend)({root,logPath:frontendLog,paymentUrl:config['connections.services.payment-url'],timeoutMs:Number(config['local.validation.frontend-start-timeout-ms'])}),stageOptions));
           tracker.update('react-frontend','STARTED','Application HTML and API proxy checks passed');
         } catch(error) {
           tracker.update('react-frontend','FAILED','Frontend or API proxy not ready; inspect frontend.log');
@@ -287,14 +290,14 @@ async function main(args=process.argv.slice(2),dependencies={}) {
   if(verification)console.log(verification.summary());
   if(showFailures && report.status==='FAILED'){
     console.log('Collecting CLI failure diagnostics...');
-    report.diagnostics=await collectServiceDiagnostics(report,directory,action==='status'?(dependencies.execute || run):run);
+    report.diagnostics=await collectServiceDiagnostics(report,directory,execute);
   }
   report.completedAt=new Date().toISOString();save();
   console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
   for(const message of failureMessages(report))console.error(redact(message));
   if(showFailures)for(const message of failureDetails(report,{root,directory}))console.error(message);
-  if(report.status==='FAILED' && !showFailures && ['start','verify','status'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
+  if(report.status==='FAILED' && !showFailures && ['start','restart','verify','status'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
   for(const message of startupMessages(report))console.log(message);
   return report;
 }

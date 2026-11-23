@@ -549,3 +549,34 @@ a bounded redacted error, exit code and timeout indicator; invalid JSON has a
 separate diagnostic cause without printing container metadata. Unknown container
 state alone does not trigger log collection from every service. Successful HTTP
 probes remain visible even if Docker inventory cannot be inspected.
+
+## Rebuilding a running application (2026-11-23)
+
+Run one lifecycle command at a time:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs restart --show-failures
+```
+
+The existing start command is safe to rerun: it builds the six backend images,
+starts missing containers and lets Compose reuse unchanged containers. Restart
+uses the same sequential startup and health/access checks, adding force-recreate
+for each of the six backends. It rebuilds before replacing each service so pulled
+Java changes and Compose environment settings apply. Docker build cache remains
+enabled; restart is not a faster no-build shortcut or docker compose restart.
+
+Both commands ensure PostgreSQL and LocalStack are running, retain their existing
+containers when unchanged, and preserve volumes. Neither removes volumes, resets
+payments, seeds records, submits payment commands or deploys to AWS. Normal service
+workers resume pending work when started. React is started if absent; a healthy
+Vite server is reused and serves watched source updates. Frontend environment or
+Vite configuration changes may require stopping its existing dev terminal before
+retrying; this command does not kill an unrecognized process on port 5173.
+
+Restart records its own timestamped report and supports --show-failures with the
+same bounded, redacted diagnostics as start. It stops at the first failed Compose
+target; a healthy old image cannot hide a failed rebuild. All backend health/auth
+and frontend/proxy checks must pass before restart success and URLs are printed.
+Payment deadlines and quote expiry still apply across a restart. Verify the live
+Codespaces run separately; controlled command tests do not establish Docker,
+authenticated payment, model or public-testnet acceptance. No architecture change.
