@@ -405,6 +405,25 @@ This is the next activity, not a record of executed public-testnet acceptance.
 9. Complete the primary USD 10,000 scenario separately after the small transfer,
    subject to sufficient test funds. Keep fiat funding/conversion labelled simulated.
 
+### Read-only RPC funding check
+
+The cross-platform preflight checks chain ID, official test-USDC contract code,
+6 decimals, native ETH and token balance at one observed block. Replace the two
+public-address placeholders; the amount defaults to 1 test USDC.
+
+~~~bash
+BLOCKCHAIN_RPC_URL=https://sepolia.base.org node --env-file=.env scripts/base-sepolia-preflight.cjs --treasury 0xYOUR_TREASURY --beneficiary 0xYOUR_BENEFICIARY --amount 1
+~~~
+
+RPC_BALANCES_READY means positive ETH and at least the requested token amount;
+FUNDING_REQUIRED means one of those checks failed. FAILED means configuration or
+RPC validation could not complete. Funding/validation failure exits with code 2.
+This script never loads signing keys, changes runtime mode or submits a transfer.
+It does not estimate complete gas fees or verify signing access; those checks
+remain necessary in application treasury readiness before execution. The explicit
+RPC environment variable above affects this command only, not Compose startup.
+The default shared network/token tuple is validated; no unofficial token is substituted.
+
 Reference [testnet setup](20-BLOCKCHAIN-TESTNET-SETUP.md),
 [treasury controls](25-TREASURY-AND-EXECUTION-READINESS.md),
 [connected flow and automated runner](30-PAYMENT-FLOW-INTEGRATION.md), and
