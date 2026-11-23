@@ -78,8 +78,8 @@ async function startupStage(name,task,{write=console.log,intervalMs=15000,progre
 }
 
 function failureMessages(report) {
-  if(!['start','restart','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
-  const label={start:'Startup',restart:'Restart',verify:'Verification',status:'Stack'}[report.action];
+  if(!['start','restart','stop','verify','status'].includes(report.action) || report.status!=='FAILED')return [];
+  const label={start:'Startup',restart:'Restart',stop:'Stop',verify:'Verification',status:'Stack'}[report.action];
   const lines=[label+' status: FAILED'];
   for(const [name,ready] of Object.entries(report.prerequisites || {}))if(!ready)lines.push(`Failed component: prerequisite:${name} | Reason: MISSING_OR_UNAVAILABLE`);
   for(const check of [...(report.checks || []),...(report.containers || [])])if(check.status==='FAILED') {

@@ -580,3 +580,60 @@ and frontend/proxy checks must pass before restart success and URLs are printed.
 Payment deadlines and quote expiry still apply across a restart. Verify the live
 Codespaces run separately; controlled command tests do not establish Docker,
 authenticated payment, model or public-testnet acceptance. No architecture change.
+
+## Stopping the complete local application (2026-11-23)
+
+Wait for an existing start/restart command to finish before pulling this update.
+Then run:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs stop --show-failures
+```
+
+Stop verifies the React development process belongs to this checkout, terminates
+it, and checks that it exited and port 5173 closed. It then stops all six backend
+containers, rechecks the worker group, and stops LocalStack followed by PostgreSQL.
+Compose allows up to 45 seconds per container before forcing termination. Final
+inventory and frontend checks are required for `Stop status: STOPPED | Components:
+9/9 stopped` and exit code 0. Failed or unavailable checks produce INCOMPLETE and
+exit code 2, with a timestamped report under `.local/validation/` and optional
+bounded redacted failure diagnostics. A repeat stop succeeds if everything is
+already stopped or absent; unavailable Docker inventory never counts as stopped.
+Java, Maven, frontend build dependencies and working API endpoints are not needed
+to stop containers. Docker and Compose must remain available for verification.
+
+Containers, networks, images and volumes are retained. No down, removal, volume
+reset, payment mutation or automatic transaction retry is issued. PostgreSQL
+records remain on the existing volume; payment deadlines and approvals continue
+to expire with time. LocalStack queue/secret persistence across its own restart
+depends on the existing LocalStack configuration; retaining its volume alone is
+not a guarantee of emulated in-memory state survival. An already submitted public
+blockchain transaction continues independently of the application.
+
+If any backend cannot be confirmed stopped, database and messaging dependencies
+are left running and the incomplete result identifies the failed checks. Unknown
+processes on port 5173 are never killed. Stop their own terminal with Ctrl+C and
+retry. Automatic frontend process inspection supports Linux/Codespaces and
+Windows and requires an identifiable Node/Vite entrypoint for this checkout.
+Other launch wrappers that hide that identity require manual frontend shutdown.
+No PID-only, process-name-only or port-only kill is used.
+
+Start, restart and stop now share a checkout-scoped local lock. A concurrent
+lifecycle command, or another listener occupying its lock port, is refused before
+application changes. The OS releases the lock when the command exits. Status
+remains read-only and can be run separately. A lifecycle command from an older
+checkout version predates this protection; let it finish before using stop.
+
+The command leaves Docker itself, the Codespace, browser windows, remote AWS
+resources, and an independently running keep-alive script alone. If finished for
+the day, stop the keep-alive terminal with Ctrl+C and stop the Codespace separately.
+Resume the retained application with:
+
+```bash
+node --env-file=.env scripts/local-workbench.cjs start --show-failures
+```
+
+This is a local lifecycle helper within ADR-010; AWS deployment architecture,
+identity permissions and financial approval rules are unchanged. Controlled CLI
+and native test-process checks do not establish real Docker/Codespaces shutdown
+or end-to-end payment acceptance; verify the nine stopped components there.

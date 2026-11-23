@@ -6,6 +6,8 @@ const {join, resolve, delimiter} = require('node:path');
 const {readConnections} = require('../services/config/read-connections.cjs');
 const {startFrontend} = require('./local-frontend.cjs');
 const {stackStatus} = require('./local-status.cjs');
+const {stopApplication}=require('./local-stop.cjs');
+const {acquireLifecycle}=require('./lifecycle-lock.cjs');
 const {startBackends} = require('./sequential-startup.cjs');
 const {containerChecks,startupStage,failureMessages,startupTracker,verificationTracker} = require('./startup-status.cjs');
 const {redact,collectServiceDiagnostics,failureDetails}=require('./failure-diagnostics.cjs');
@@ -151,8 +153,8 @@ function startupMessages(report, environment=process.env, config) {
 }
 function validationArguments(args) {
   const action=args[0] || 'doctor',options=args.slice(1);
-  const allowed={doctor:[],smoke:[],status:['--show-failures'],start:['--show-failures'],restart:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
-  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|status [--show-failures]|start|restart [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
+  const allowed={doctor:[],smoke:[],status:['--show-failures'],start:['--show-failures'],restart:['--show-failures'],stop:['--show-failures'],verify:['--offline','--require-database','--show-failures']};
+  if(!Object.hasOwn(allowed,action) || options.some(option=>!allowed[action].includes(option)))throw Error('Usage: node scripts/local-workbench.cjs doctor|smoke|status [--show-failures]|start|restart|stop [--show-failures]|verify [--offline] [--require-database] [--show-failures]');
   return {action,showFailures:options.includes('--show-failures')};
 }
 async function main(args=process.argv.slice(2),dependencies={}) {
@@ -166,6 +168,7 @@ async function main(args=process.argv.slice(2),dependencies={}) {
   const tracker=starting?startupTracker():null;
   const verification=action==='verify'?verificationTracker():null;
   let activeVerification='prerequisites';
+  let releaseLifecycle;
   const stageOptions={progress:()=> (tracker || verification).progress()};
   const componentFor=name=>({payment:'payment-service','compliance-quote':'compliance-quote-service',blockchain:'blockchain-service',ledger:'settlement-ledger-service',reconciliation:'reconciliation-service',visa:'visa-simulator'})[name];
   const save=()=>{if(tracker || verification)report.progress=(tracker || verification).progress();writeFileSync(file,JSON.stringify(report,null,2)+'\n','utf8');};save();
@@ -174,7 +177,22 @@ async function main(args=process.argv.slice(2),dependencies={}) {
   if(action==='restart')console.log('Rebuild and recreate all six backends; retain PostgreSQL/LocalStack and data volumes. Reuse a healthy React dev server.');
   if(verification)console.log(verification.summary()+' (check-based; not elapsed time or payment acceptance)');
   try {
+    if(starting || action==='stop')releaseLifecycle=await (dependencies.acquireLifecycle || acquireLifecycle)(root);
     const config=dependencies.config || (starting?readConnections():undefined);
+    if(action==='stop') {
+      console.log('Stop order: React > six backend services > LocalStack > PostgreSQL. Containers and volumes are retained.');
+      const logPath=join(directory,'compose-stop.log'),log=openSync(logPath,'w');
+      try {
+        Object.assign(report,await stopApplication({root,execute,log,frontend:dependencies.stopFrontend,onCheck:check=>{
+          report.checks.push({...check,log:check.name==='react-frontend'?undefined:logPath});save();
+          console.log('['+check.status+'] '+check.name+' | '+(check.reason || 'CHECKED'));
+        }}));
+        // Keep the log location on checks in the final report for bounded failure diagnostics.
+        for(const check of report.checks)if(check.name!=='react-frontend')check.log=logPath;
+      }finally{closeSync(log);}
+      const stopped=report.components.filter(c=>c.status==='PASSED').length;
+      console.log('Stop status: '+(report.status==='PASSED'?'STOPPED':'INCOMPLETE')+' | Components: '+stopped+'/9 stopped');
+    }
     if(action==='status') {
       console.log('Checking existing stack only; no build, start, restart or payment commands.');
       const config=dependencies.config || readConnections();
@@ -285,7 +303,7 @@ async function main(args=process.argv.slice(2),dependencies={}) {
         report.scope='LOCAL_FRONTEND_HEALTH_AND_ACCESS_BOUNDARY_ONLY';
       }
     }
-  } catch(error) {report.status='FAILED';report.reason=action==='status'?'Status check could not complete; verify local connection settings':error.message;if(verification)verification.update(activeVerification,'FAILED');}
+  } catch(error) {report.status='FAILED';report.reason=action==='status'?'Status check could not complete; verify local connection settings':error.message;if(verification)verification.update(activeVerification,'FAILED');}finally{await releaseLifecycle?.();}
   if(tracker){report.components=tracker.snapshot();console.log(tracker.summary());}
   if(verification)console.log(verification.summary());
   if(showFailures && report.status==='FAILED'){
@@ -293,11 +311,11 @@ async function main(args=process.argv.slice(2),dependencies={}) {
     report.diagnostics=await collectServiceDiagnostics(report,directory,execute);
   }
   report.completedAt=new Date().toISOString();save();
-  console.log(`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
+  console.log(action==='stop'?`Result: ${report.status}. Stop only; containers, volumes and recorded payments were retained.`:`Result: ${report.status}. Full payment, live identity/model and public-testnet acceptance are separate gates.`);
   if(['FAILED','BLOCKED'].includes(report.status))process.exitCode=2;
   for(const message of failureMessages(report))console.error(redact(message));
   if(showFailures)for(const message of failureDetails(report,{root,directory}))console.error(message);
-  if(report.status==='FAILED' && !showFailures && ['start','restart','verify','status'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
+  if(report.status==='FAILED' && !showFailures && ['start','restart','stop','verify','status'].includes(action))console.error('Tip: add --show-failures to print bounded, redacted diagnostics in the CLI.');
   for(const message of startupMessages(report))console.log(message);
   return report;
 }

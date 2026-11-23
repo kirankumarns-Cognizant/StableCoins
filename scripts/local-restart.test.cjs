@@ -10,7 +10,7 @@ const {readConnections}=require('../services/config/read-connections.cjs');
 
 function fixture(failure) {
  const calls=[];let frontends=0;
- const dependencies={config:readConnections({}),doctor:async()=>({node:true,java21:true,docker:true,compose:true,dependencies:true}),
+ const dependencies={acquireLifecycle:async()=>()=>{},config:readConnections({}),doctor:async()=>({node:true,java21:true,docker:true,compose:true,dependencies:true}),
   execute:async(exe,args)=>{
    calls.push(args);
    if(args.includes('ps'))return {code:0,stdout:JSON.stringify(backendOrder.map(Service=>({Service,State:'running',Health:'healthy'})))};
