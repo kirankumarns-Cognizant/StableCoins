@@ -384,3 +384,13 @@ STOP.
 Propose an ADR.
 
 Do not silently implement a different architecture.
+---
+
+## 18. Operational Handover
+
+Before continuing demo operations, read [the central SOP](docs/37-DEMO-OPERATIONS-SOP.md)
+and [current activity status](docs/36-POC-ACTIVITY-STATUS.md). Read available ignored
+.local/poc-status/ handover records for private run details; these records are
+local-only and may not exist in another checkout. Do not publish their contents.
+Record observed results and the next step after material demo activities. Do not
+assume conversation history or a compaction summary contains all runtime evidence.

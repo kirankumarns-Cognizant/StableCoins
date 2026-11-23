@@ -6,6 +6,15 @@ unexecuted live acceptance complete. Launch prerequisites are in
 [the Codespaces guide](34-CODESPACES-DEMO-LAUNCH.md), and exact screen actions are
 in [the cumulative demo runbook](29-PROTOTYPE-EXECUTION-RUNBOOK.md).
 
+## Activity update - 2026-11-23
+
+The owner-observed MOCK USDC wallet walkthrough reached RECONCILED with a
+CONFIRMED execution and 2/2 approvals. See [the latest POC activity checkpoint](36-POC-ACTIVITY-STATUS.md)
+for evidence provenance, limits and next activities. The earlier preparation
+status above is historical; overall acceptance remains in progress. Real runtime
+inference, independently verified public-testnet settlement and the other
+completion gates below are not established by this MOCK run.
+
 ## Product proposition and prospective buyer
 
 StableFlow is a configurable stablecoin payment and treasury control layer for a

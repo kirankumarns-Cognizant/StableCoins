@@ -4,6 +4,13 @@ Current delivery status (2026-11-15): **9 of 11 steps code-complete**.
 Connected UI setup and exact screen actions are in [the step-9 guide](docs/32-CONNECTED-REACT-WORKSPACE.md).
 Live AWS/provider/testnet acceptance and the final Word document remain in steps 10-11.
 
+## Demo operations and current status
+
+Start with the [central demo SOP and command index](docs/37-DEMO-OPERATIONS-SOP.md)
+and [latest POC activity checkpoint](docs/36-POC-ACTIVITY-STATUS.md).
+The dated delivery statement above is historical; current evidence and remaining
+acceptance gates are recorded in those documents.
+
 ## Overview
 
 This repository contains a Proof of Concept demonstrating an AWS-native

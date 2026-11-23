@@ -1,7 +1,9 @@
 # Prototype Execution and Feature Demonstration - living runbook
 
-Status: IN PROGRESS. This is the required final demonstration deliverable and is
-updated alongside each implementation step. Pending steps are not executable proof.
+Status: IN PROGRESS overall. The owner-observed MOCK wallet walkthrough reached
+RECONCILED on 2026-11-23; see [the latest POC activity checkpoint](36-POC-ACTIVITY-STATUS.md). Real-model, public-testnet and remaining acceptance gates stay open.
+This living runbook preserves dated historical observations below; pending steps
+are not executable proof.
 
 ## Opening narrative: the complete payment story
 
