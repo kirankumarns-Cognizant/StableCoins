@@ -268,3 +268,22 @@ Use [its setup/API/security guide](32-CONNECTED-REACT-WORKSPACE.md) and the
 [complete role/context/action/outcome runbook](29-PROTOTYPE-EXECUTION-RUNBOOK.md).
 Earlier verification records above remain historical; current scope is recorded
 in [step-9 verification](step9-build-results.json).
+
+## Intent set comparison correction (2026-11-23)
+
+Consumer approval validation compares allowedOutcomes and allowedProviderIds in
+policy, and allowedAlternatives in instruction, as unordered string sets. These
+three fields are declared as Java Set values; JSON serialization order can differ
+between the reviewed and current snapshots without a business change. Only those
+paths are normalized on copies. Other fields and array order remain significant;
+missing, non-array, non-string, blank or duplicate set members fail closed.
+Current approval, expiry, recipient, preparation, canonical request and current
+instruction checks remain mandatory. No stored snapshot or financial record is
+rewritten. Regression tests exercise the JDBC approval row mapper and rejection
+gates; they do not establish a connected payment or public-testnet result.
+
+After pulling this fix, rebuild/restart backend services. Preserve expired
+execution records for audit; create a new payment when its confirmed delivery
+deadline has passed, prepare fresh evidence, obtain both independent approvals
+on that version, then execute before quote expiry. Do not replay old queue
+messages or edit database approvals to resume an expired execution.

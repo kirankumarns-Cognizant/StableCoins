@@ -24,7 +24,7 @@ public class FlowReadModels {
  public void requireApproved(Execution execution){
   var rows=jdbc.query("select r.state,r.expires_at,r.document::text,p.intent_snapshot::text current_intent from routing_recommendation r join payment p on p.payment_id=r.payment_id where r.recommendation_id=? and r.payment_id=? and r.correlation_id=?",(rs,n)->{
    var document=FlowJson.value(mapper,rs.getString(3),JsonNode.class);
-   return document.path("intent").equals(FlowJson.value(mapper,rs.getString("current_intent"),JsonNode.class))&&Set.of("APPROVED","EXECUTED").contains(rs.getString(1))&&rs.getTimestamp(2).toInstant().isAfter(java.time.Instant.now())&&execution.request().recipientWallet().equalsIgnoreCase(document.path("instruction").path("recipientWallet").asText())&&execution.preparationId().toString().equals(document.path("evidence").path("snapshotId").asText());
+   return IntentSnapshotComparison.matches(document.path("intent"),FlowJson.value(mapper,rs.getString("current_intent"),JsonNode.class))&&Set.of("APPROVED","EXECUTED").contains(rs.getString(1))&&rs.getTimestamp(2).toInstant().isAfter(java.time.Instant.now())&&execution.request().recipientWallet().equalsIgnoreCase(document.path("instruction").path("recipientWallet").asText())&&execution.preparationId().toString().equals(document.path("evidence").path("snapshotId").asText());
   },execution.recommendationId(),execution.paymentId(),execution.correlationId());
   if(rows.size()!=1||!rows.getFirst()||!execution.expiresAt().isAfter(java.time.Instant.now()))throw new IllegalStateException("CURRENT_APPROVAL_REQUIRED");
   requireRequested(execution.request());
