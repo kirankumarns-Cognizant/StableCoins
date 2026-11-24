@@ -4,7 +4,7 @@
 #
 # Java 21 — approved architecture (AGENTS.md, CLAUDE.md).
 # Private keys must NEVER be baked into this image (AGENTS.md §10).
-# Wallet private key is loaded at runtime from AWS Secrets Manager.
+# Local signing inputs are supplied at runtime; AWS Secrets Manager/KMS integration is a separate gate.
 
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app

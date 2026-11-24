@@ -388,12 +388,12 @@ This is the next activity, not a record of executed public-testnet acceptance.
    test USDC. Record faucet funding hashes separately from application hashes.
 3. Read chain ID, token contract/decimals and actual on-chain balances via RPC.
    Expected chain ID is 84532. Positive ETH alone does not prove sufficient gas.
-4. Resolve the encrypted-keystore signer integration and wallet-file location.
+4. Configure the local encrypted-keystore signer and wallet-file location (see below).
    Keep secret input out of command arguments, terminal output, Git and PostgreSQL.
 5. Prepare and review an explicit Compose/profile override for the intended
    containers. REAL_TESTNET plus TESTNET_ENABLED=true are required, and the local
    profile must be deliberately overridden. Setting .env alone is insufficient
-   because the base Compose file forces MOCK/testnet-off. Verify effective runtime
+   because the base Compose file forces MOCK/testnet-off. Use the explicit local overlay below. Verify effective runtime
    mode without dumping environment secrets. Do not use a fictional override file.
 6. Verify on-chain treasury readiness and a new 1-test-USDC instruction. Complete
    the same two-person approval/execution flow above within the actual expiry.
@@ -485,3 +485,88 @@ MOCK runs, real-model inference and public-chain acceptance as interchangeable.
 Pending preparation/execution commands must be promoted into this SOP only after
 the corresponding implementation exists and the command has been checked. Keep
 authoritative commands in scripts or SQL files and link them here to avoid drift.
+
+### Codespaces encrypted-keystore activation
+
+This is the existing local testnet signer boundary, extended to accept an encrypted
+Ethereum V3 keystore. It is not AWS Secrets Manager/KMS or institutional custody.
+The file provider requires the local profile and rejects aws-dev. The legacy raw-key
+provider remains available for existing test tooling; do not configure both sources.
+The keystore and password are read only at process startup; changing either requires
+a restart. Decrypted signing credentials remain in JVM memory for the process lifetime.
+
+Before activation, inspect unresolved executions/queues using the read-only payment
+inspection steps. Restarting consumers can resume prior work; startup is not a
+promise that no previously authorized execution will be processed. Do not reuse a
+MOCK review or expired instruction for the real test. Preserve payment history.
+
+1. Upload the verified encrypted treasury file into ignored `.local/wallets/`.
+   Confirm its public address and checksum privately. Keep mode 600, owned by the
+   Codespaces user. The beneficiary keystore is not needed for sending to its address.
+2. From the repository root in an interactive Codespaces Bash terminal, create
+   the ignored password file using hidden input and confirmation:
+
+~~~bash
+bash scripts/prepare-testnet-password.sh
+~~~
+
+The helper refuses to overwrite an existing password file. It writes the password
+exactly, without a newline, under `.local/secrets/` with owner-only permissions.
+Do not paste the password into command arguments, .env, chat, logs or Git. Compose
+file-backed secrets are local protected files, not an encrypted secret store; anyone
+with host/Docker administrative access can read them. Never run `docker compose config`
+with secret contents interpolated into environment variables.
+
+3. Export NONSECRET settings in the same terminal; substitute the expected public
+   treasury address. These paths describe the uploaded file, not a new wallet:
+
+~~~bash
+export TESTNET_KEYSTORE_FILE="$PWD/.local/wallets/treasury-wallet.json"
+export TESTNET_PASSWORD_FILE="$PWD/.local/secrets/treasury-password"
+export TESTNET_TREASURY_ADDRESS=0xYOUR_VERIFIED_TREASURY_ADDRESS
+export TESTNET_LOCAL_UID="$(id -u)"
+export TESTNET_LOCAL_GID="$(id -g)"
+export TESTNET_RPC_URL=https://sepolia.base.org
+export COMPOSE_FILE=docker-compose.yml:docker-compose.testnet.yml
+
+git check-ignore -- .local/wallets/treasury-wallet.json .local/secrets/treasury-password
+docker compose --profile services config --quiet
+~~~
+
+The overlay explicitly selects local,testnet, REAL_TESTNET, TESTNET_ENABLED=true,
+Base Sepolia chain 84532 and official six-decimal test USDC. Only blockchain-service
+receives the two secret mounts; the raw-key environment input is cleared. Required
+host UID/GID preserve owner-only file access under the non-root container process.
+The expected address is checked against decrypted credentials, never trusted from
+keystore JSON metadata alone. Incorrect secrets/configuration stop startup with
+bounded error codes; no automatic fallback to another signing key occurs.
+
+4. After reviewing outstanding work, rebuild/restart through the existing helper:
+
+~~~bash
+node --env-file=.env scripts/local-workbench.cjs restart --show-failures
+~~~
+
+Keep COMPOSE_FILE and the nonsecret settings exported for subsequent status/restart/
+stop commands in this session. A new terminal needs the same exports. Normal startup
+without this opt-in overlay still selects MOCK; do not alternate modes mid-payment.
+The overlay overrides only blockchain-service; funding, compliance, FX and payout
+simulation boundaries are unchanged. It does not enable disabled agent/operator
+feature flags or bypass approvals.
+
+5. Inspect only the relevant startup lines:
+
+~~~bash
+docker compose logs --no-color --tail 200 blockchain-service |
+  rg 'keystore_signer_verified|mode_real_testnet|TESTNET_|PUBLIC_TESTNET_|FILE_KEYSTORE_'
+~~~
+
+Require keystore_signer_verified for the expected public address and
+mode_real_testnet network=base-sepolia chainId=84532. Health alone does not establish
+these facts. Then perform a fresh preparation, inspect non-MOCK treasury evidence,
+validate fee coverage and continue the two-approver 1-USDC flow. Receipt verification
+remains authoritative. Existing treasury readiness uses buffered gas plus a configured
+allowance; it is not a measured complete Base L1/operator fee quote.
+
+AWS execution remains a separate gate requiring the approved Secrets Manager/KMS
+integration; do not mount this local password file into ECS or bake it into an image.

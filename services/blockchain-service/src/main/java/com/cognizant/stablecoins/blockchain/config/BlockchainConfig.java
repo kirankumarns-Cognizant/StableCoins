@@ -6,6 +6,8 @@ import com.cognizant.stablecoins.blockchain.service.MockBlockchainAdapter;
 import com.cognizant.stablecoins.blockchain.service.RealTestnetBlockchainAdapter;
 import com.cognizant.stablecoins.blockchain.service.WalletSigningService;
 import com.cognizant.stablecoins.blockchain.service.LocalTestnetSigningService;
+import com.cognizant.stablecoins.blockchain.service.KeystoreTestnetSigningService;
+import org.springframework.core.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -35,13 +37,36 @@ public class BlockchainConfig {
     }
 
     @Bean
-    public WalletSigningService walletSigningService(BlockchainProperties props, TestnetProperties testnetProps) {
+    public WalletSigningService walletSigningService(BlockchainProperties props, TestnetProperties testnetProps,
+                                                     Environment environment) {
         boolean isReal = props.getMode() == BlockchainMode.REAL_TESTNET && testnetProps.isEnabled();
         if (isReal) {
-            String privateKey = System.getenv("BLOCKCHAIN_WALLET_PRIVATE_KEY");
+            String privateKey = environment.getProperty("BLOCKCHAIN_WALLET_PRIVATE_KEY");
+            String keystore = environment.getProperty("BLOCKCHAIN_KEYSTORE_FILE");
+            String passwordFile = environment.getProperty("BLOCKCHAIN_KEYSTORE_PASSWORD_FILE");
+            boolean hasKeystore = keystore != null && !keystore.isBlank();
+            boolean hasPasswordFile = passwordFile != null && !passwordFile.isBlank();
+            boolean hasPrivateKey = privateKey != null && !privateKey.isBlank();
+            if (hasKeystore || hasPasswordFile) {
+                if (hasPrivateKey || !hasKeystore || !hasPasswordFile) {
+                    throw new IllegalStateException("TESTNET_SIGNING_CONFIGURATION_CONFLICT");
+                }
+                if (props.getChainId() != 84532L && props.getChainId() != 11155111L) {
+                    throw new IllegalStateException("PUBLIC_TESTNET_CHAIN_REQUIRED");
+                }
+                if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local"))
+                        || environment.acceptsProfiles(org.springframework.core.env.Profiles.of("aws-dev"))) {
+                    throw new IllegalStateException("FILE_KEYSTORE_SIGNER_LOCAL_ONLY");
+                }
+                var signer = new KeystoreTestnetSigningService(java.nio.file.Path.of(keystore),
+                        java.nio.file.Path.of(passwordFile),
+                        environment.getProperty("BLOCKCHAIN_EXPECTED_WALLET_ADDRESS"));
+                log.info("service=blockchain-service event=keystore_signer_verified wallet={}", signer.getWalletAddress());
+                return signer;
+            }
             if (privateKey == null || privateKey.isBlank()) {
                 throw new IllegalStateException(
-                    "BLOCKCHAIN_WALLET_PRIVATE_KEY env var is required for REAL_TESTNET mode");
+                    "TESTNET_SIGNING_CONFIGURATION_REQUIRED");
             }
             return new LocalTestnetSigningService(privateKey);
         }

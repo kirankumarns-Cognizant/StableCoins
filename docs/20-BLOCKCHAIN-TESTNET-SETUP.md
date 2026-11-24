@@ -3,7 +3,7 @@
 > Step 4 update: the existing blockchain execution controller is default-off.
 > `BLOCKCHAIN_EXECUTION_API_ENABLED=true` is required only for a deliberately
 > protected internal testnet setup; it does not provide authentication.
-> Current signing remains the local environment-key provider. Secrets Manager/KMS
+> Local signing supports an encrypted keystore/password-file provider as well as the legacy environment-key provider. See the Codespaces activation section in docs/37-DEMO-OPERATIONS-SOP.md. Secrets Manager/KMS
 > signing and an actual transfer integration test are still required before AWS
 > execution. Readiness uses buffered RPC gas plus an explicit allowance, not a
 > measured complete Base data-fee quote. See

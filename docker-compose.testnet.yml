@@ -1,0 +1,30 @@
+# Explicit LOCAL public-testnet overlay. Never automatically included by normal startup.
+# See docs/37-DEMO-OPERATIONS-SOP.md before activating: existing queues may resume work.
+services:
+  blockchain-service:
+    # Host files remain mode 600. Run as their Codespaces owner so the non-root
+    # container can read bind-mounted Compose secrets without world-readable files.
+    user: "${TESTNET_LOCAL_UID:?Set TESTNET_LOCAL_UID using id -u}:${TESTNET_LOCAL_GID:?Set TESTNET_LOCAL_GID using id -g}"
+    environment:
+      SPRING_PROFILES_ACTIVE: local,testnet
+      BLOCKCHAIN_MODE: REAL_TESTNET
+      TESTNET_ENABLED: "true"
+      BLOCKCHAIN_NETWORK: base-sepolia
+      BLOCKCHAIN_CHAIN_ID: "84532"
+      BLOCKCHAIN_RPC_URL: "${TESTNET_RPC_URL:-https://sepolia.base.org}"
+      BLOCKCHAIN_TOKEN_CONTRACT: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+      BLOCKCHAIN_TOKEN_DECIMALS: "6"
+      BLOCKCHAIN_EXPLORER_BASE_URL: https://sepolia.basescan.org
+      # Explicitly clear the legacy raw-key input inherited from base Compose.
+      BLOCKCHAIN_WALLET_PRIVATE_KEY: ""
+      BLOCKCHAIN_KEYSTORE_FILE: /run/secrets/treasury_keystore
+      BLOCKCHAIN_KEYSTORE_PASSWORD_FILE: /run/secrets/treasury_password
+      BLOCKCHAIN_EXPECTED_WALLET_ADDRESS: "${TESTNET_TREASURY_ADDRESS:?Set the expected public treasury address}"
+    secrets:
+      - treasury_keystore
+      - treasury_password
+secrets:
+  treasury_keystore:
+    file: "${TESTNET_KEYSTORE_FILE:?Set the ignored encrypted treasury file path}"
+  treasury_password:
+    file: "${TESTNET_PASSWORD_FILE:?Set the ignored password file path}"

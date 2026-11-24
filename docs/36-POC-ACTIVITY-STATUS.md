@@ -97,3 +97,29 @@ This checkpoint supersedes earlier blocked MOCK wallet walkthrough statuses for
 that path only. It does not mark the entire POC, live inference, public-testnet
 settlement, optional payout, or AWS application deployment complete. No
 architecture, service, database, permission or financial-rule changes are made.
+
+## Local encrypted-keystore implementation - 2026-11-24
+
+Local/Codespaces signing now supports an encrypted V3 keystore and a separate
+password file through the existing WalletSigningService boundary. The file provider
+requires local profile (rejects aws-dev), rejects mixed/incomplete sources and the
+known MOCK signer, checks the decrypted public address against an explicit expected
+address, and restricts signing to the two accepted public testnets. Legacy raw-key
+tooling remains available; ordinary startup keeps the existing two-flag MOCK guard.
+An explicit docker-compose.testnet.yml overlay selects Base Sepolia and mounts
+file-backed secrets for blockchain-service only. No image contains a wallet/password.
+
+Java 21 compilation and 16 focused signing/configuration tests passed with zero
+failures/errors/skips. These tests generated disposable fixture wallets and used
+no owner secrets or public RPC. The first sandboxed build failed in compiler resource
+cleanup; the approved rerun outside the sandbox passed. Bash syntax validation passed
+for the hidden-input password preparation helper. Docker Compose configuration was
+parsed/asserted in a unit test; actual Compose merge, secret mounting/container
+startup and public-testnet settlement were not executed on this Windows host.
+
+This is a local source implementation, not evidence of GitHub publication, Codespaces
+activation or AWS secret integration. See the Codespaces encrypted-keystore activation
+section in the central SOP. Next: distribute/review the change in Codespaces, inspect
+outstanding work before restarting consumers, create the protected password file,
+validate Compose/runtime signer address and fee coverage, then execute a fresh approved
+1-test-USDC payment and independently verify its receipt and reconciliation.
