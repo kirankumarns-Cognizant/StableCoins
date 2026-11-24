@@ -512,6 +512,12 @@ bash scripts/prepare-testnet-password.sh
 
 The helper refuses to overwrite an existing password file. It writes the password
 exactly, without a newline, under `.local/secrets/` with owner-only permissions.
+The helper explicitly applies and checks mode 600 after writing; umask alone does
+not establish the resulting permissions on every filesystem. Before activation,
+verify both secret files with `stat -c '%a %U %n'` and require mode 600. If an
+existing password file has broader permissions, run
+`chmod 600 -- .local/secrets/treasury-password` and verify it again; do not recreate
+or print its contents.
 Do not paste the password into command arguments, .env, chat, logs or Git. Compose
 file-backed secrets are local protected files, not an encrypted secret store; anyone
 with host/Docker administrative access can read them. Never run `docker compose config`
