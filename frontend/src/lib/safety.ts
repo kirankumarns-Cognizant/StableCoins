@@ -12,7 +12,7 @@ export function decimal(value: bigint, scale: number): string {
 }
 export function balance(entries: {asset:string;debit:string;credit:string}[]): Record<string,string> {
   if(entries.length===0)throw new Error('No ledger entries recorded')
-  const scales:Record<string,number> = {USD:2, INR:2, USDC:6, ETH:18}
+  const scales:Record<string,number> = {USD:2, INR:2, USDC:6, ETH:18, DEMOUSD:6, BESU_GAS:18}
   const totals:Record<string,bigint> = {}
   for (const e of entries) {if (!(e.asset in scales)) throw new Error('Unsupported asset');totals[e.asset]=(totals[e.asset]??0n)+units(e.debit,scales[e.asset])-units(e.credit,scales[e.asset])}
   return Object.fromEntries(Object.entries(totals).map(([asset,total])=>[asset,decimal(total,scales[asset])]))

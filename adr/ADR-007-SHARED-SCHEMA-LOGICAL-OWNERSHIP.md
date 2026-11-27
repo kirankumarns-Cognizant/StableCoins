@@ -98,3 +98,21 @@ write, schema constraint relaxation or additional service is introduced. Added
 PostgreSQL cases cover immediate FK visibility and rollback after flush; local
 compilation is verified, live database execution remains pending. See the dated
 [UI recovery notes](../docs/29-PROTOTYPE-EXECUTION-RUNBOOK.md).
+
+## Besu preparation implementation note - 2026-11-25
+
+The additive read-only private preparation handoff introduces payment-owned
+payment_settlement_preparation (V14) and blockchain-owned
+besu_preparation_observation (V7). Payment requests publish through the existing
+payment outbox; only the blockchain owner writes observations. Shared canonical
+request/current-intent checks and evidence reads perform no cross-owner writes.
+This applies the existing accepted logical ownership decision; it does not enable
+Besu payment selection, reservations or execution.
+
+## Besu commitment storage implementation note - 2026-11-25
+
+Blockchain service additionally owns besu_treasury_scope,
+besu_liquidity_commitment and besu_preparation_availability (V8). Payment service
+reads immutable availability and never writes these tables. Execution binding
+reads retain the existing accepted cross-owner read boundary. No decision or
+ownership-policy change; approval/execution integration remains gated.

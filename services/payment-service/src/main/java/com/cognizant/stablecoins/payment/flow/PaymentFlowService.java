@@ -35,6 +35,7 @@ public class PaymentFlowService {
  public record ExecutionView(UUID executionId,String paymentId,String status,UUID transactionId,String failureCode){}
  public Preparation prepare(String paymentId,UUID key,AuthorizedCustomer actor){
   var p=lock(paymentId,actor);
+  com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(p);
   var existing=jdbc.query("select request_id,payment_id,status,recommendation_id,failure_code from payment_flow_preparation where request_id=?",(rs,n)->new Preparation(rs.getObject(1,UUID.class),rs.getString(2),rs.getString(3),rs.getObject(4,UUID.class),rs.getString(5)),key);
   if(!existing.isEmpty()){if(!paymentId.equals(existing.getFirst().paymentId()))throw conflict("PREPARATION_KEY_CONFLICT");return existing.getFirst();}
   if(!"COMPLIANCE_APPROVED".equals(p.getStatus()))throw conflict("COMPLIANCE_APPROVAL_REQUIRED");
@@ -65,6 +66,7 @@ public class PaymentFlowService {
  }
  public ExecutionView execute(String paymentId,UUID recommendationId,UUID key,int version,UUID quoteId,int quoteVersion,AuthorizedCustomer actor){
   var p=lock(paymentId,actor);
+  com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(p);
   var existing=jdbc.query("select execution_id,payment_id,status,transaction_id,failure_code,recommendation_id from payment_execution where payment_id=? or execution_id=?",(rs,n)->Map.entry(new ExecutionView(rs.getObject(1,UUID.class),rs.getString(2),rs.getString(3),rs.getObject(4,UUID.class),rs.getString(5)),rs.getObject(6,UUID.class)),paymentId,key);
   if(!existing.isEmpty()){
    var row=existing.getFirst();if(existing.size()!=1||!row.getKey().executionId().equals(key)||!row.getKey().paymentId().equals(paymentId)||!row.getValue().equals(recommendationId))throw conflict("EXECUTION_KEY_CONFLICT");
@@ -91,6 +93,7 @@ public class PaymentFlowService {
   String chainStatus=(String)tx.get("status");UUID transactionId=(UUID)tx.get("transaction_id");
   if(Set.of("PREPARING","AWAITING_LEDGER","SUBMISSION_REQUESTED").contains(execution.status())&&"PREPARED".equals(chainStatus)&&!execution.expiresAt().isAfter(Instant.now()))throw conflict("EXECUTION_APPROVAL_EXPIRED");
   if("PREPARING".equals(execution.status())){
+   com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(p);
    if(!env.getProperty("app.flow.execution-enabled",Boolean.class,false))return;
    reads.requireApproved(execution);reads.requireExecutionTransaction(execution,transactionId);if(!reads.validated(id))return;
    var approvedQuote=reads.quote(execution.preparationId()).orElseThrow().document();
@@ -109,6 +112,7 @@ public class PaymentFlowService {
    jdbc.update("update payment_execution set status='AWAITING_LEDGER',transaction_id=?,updated_at=now() where execution_id=?",transactionId,id);return;
   }
   if("AWAITING_LEDGER".equals(execution.status())){
+   com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(p);
    if(!env.getProperty("app.flow.execution-enabled",Boolean.class,false))return;
    reads.requireApproved(execution);var quote=reads.quote(execution.preparationId()).orElseThrow().document();
    if(!reads.funded(execution,quote))return;

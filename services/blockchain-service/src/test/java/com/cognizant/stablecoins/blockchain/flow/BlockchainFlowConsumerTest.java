@@ -30,4 +30,14 @@ class BlockchainFlowConsumerTest {
  @Test void disabledExecutionCannotSubmit(){env.setProperty("app.flow.execution-enabled","false");assertThatThrownBy(()->consumer.submit(body("BlockchainSubmissionRequested"))).hasMessage("EXECUTION_DISABLED");verifyNoInteractions(chain);}
  @Test void reservationWaitsForCompliance(){when(reads.validated(id)).thenReturn(false);assertThatThrownBy(()->consumer.reserve(body("StablecoinExecutionRequested"))).hasMessage("COMPLIANCE_VALIDATION_PENDING");verifyNoInteractions(chain);}
  @Test void receiptMonitoringContinuesWhenNewExecutionDisabled(){env.setProperty("app.flow.execution-enabled","false");tx.setStatus("SUBMISSION_UNKNOWN");when(transactions.findByStatus("SUBMISSION_UNKNOWN")).thenReturn(List.of(tx));consumer.receipts();verify(chain).confirmTransaction(txId);verify(chain,never()).submitTransaction(any());}
+
+ @Test void privateObservationCannotFallIntoLegacyUsdcReadiness(){
+  assertThatThrownBy(()->consumer.observe(body(SettlementPreparation.EVENT))).hasMessage("BESU_OBSERVATION_DISABLED");
+  verifyNoInteractions(chain);
+ }
+ @Test void privateObservationDispatchesOnlyToDedicatedObserver(){
+  var observer=mock(com.cognizant.stablecoins.blockchain.besu.BesuPreparationObserver.class);consumer.besuObserver(observer);
+  String command=body(SettlementPreparation.EVENT);consumer.observe(command);
+  verify(observer).observe(command);verifyNoInteractions(chain);
+ }
 }

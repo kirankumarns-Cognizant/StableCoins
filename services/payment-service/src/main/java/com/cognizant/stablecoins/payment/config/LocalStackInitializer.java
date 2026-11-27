@@ -36,6 +36,14 @@ public class LocalStackInitializer {
             for(String name:List.of("flow-quote","flow-treasury","flow-validation","flow-reservation","flow-submission","receipt-observed","settlement-requested","visa-payout","ledger-payout","reconciliation-requested"))
                 allRoutes.add(new String[]{environment.getRequiredProperty("app.sqs."+name+"-queue-name"),environment.getRequiredProperty("app.sqs."+name+"-dlq-name")});
         }
+        if(environment!=null && environment.getProperty("app.besu.funding-events.enabled",Boolean.class,false)) {
+            String queue=environment.getRequiredProperty("app.sqs.besu-ledger-funding-queue-name");
+            String dlq=environment.getRequiredProperty("app.sqs.besu-ledger-funding-dlq-name");
+            if(queue.isBlank() || dlq.isBlank() || queue.equals(dlq) ||
+                    allRoutes.stream().anyMatch(r -> queue.equals(r[0]) || queue.equals(r[1]) || dlq.equals(r[0]) || dlq.equals(r[1])))
+                throw new IllegalStateException("Dedicated Besu funding queue and DLQ required");
+            allRoutes.add(new String[]{queue,dlq});
+        }
         for(var route:allRoutes) {
             String deadUrl=create(route[1]);
             String arn=sqs.getQueueAttributes(GetQueueAttributesRequest.builder().queueUrl(deadUrl).attributeNames(QueueAttributeName.QUEUE_ARN).build())

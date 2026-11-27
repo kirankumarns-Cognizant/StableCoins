@@ -120,4 +120,13 @@ class PaymentIntentServiceTest {
         assertThatThrownBy(()->new CustomerRoutingPolicy("v1",Set.of(BeneficiaryOutcome.USDC_WALLET),
             Set.of("provider"),BigDecimal.ZERO,0)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test void tokenWalletCreationRemainsGatedEvenWithPermissivePolicy() {
+        var properties=new RoutingPolicyProperties();
+        properties.setPolicies(Map.of(CUSTOMER,new CustomerRoutingPolicy("private-test",Set.of(BeneficiaryOutcome.TOKEN_WALLET),Set.of("private-provider"),new BigDecimal("50"),2)));
+        service=new PaymentIntentService(factory.getValidator(),properties,Clock.fixed(Instant.parse("2026-11-14T08:00:00Z"),ZoneOffset.UTC));
+        var i=request.getIntent();
+        request.setIntent(new PaymentIntentRequest(BeneficiaryOutcome.TOKEN_WALLET,i.deliverBy(),i.maximumFee(),i.feeCurrency(),i.priority(),Set.of(),true));
+        rejects("BESU_PAYMENT_ACCEPTANCE_PENDING");
+    }
 }

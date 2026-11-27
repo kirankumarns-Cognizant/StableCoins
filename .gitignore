@@ -82,3 +82,7 @@ artifacts/
 !scripts/generate-test-wallets/src/**/wallets/
 scripts/generate-test-wallets/src/**/wallets/*
 !scripts/generate-test-wallets/src/**/wallets/*.java
+
+# Reproducible isolated Besu setup dependencies.
+!/infrastructure/besu/package.json
+!/infrastructure/besu/package-lock.json

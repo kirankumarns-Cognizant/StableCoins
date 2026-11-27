@@ -142,6 +142,10 @@ public class PaymentService {
         payment.setIdempotencyKey(idempotencyKey);
         payment.setRequestFingerprint(fingerprint);
         paymentRepository.save(payment);
+        if (com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.isExplicit(payment)) {
+            paymentRepository.flush(); // Owner row visible to JDBC without committing.
+            intentService.captureSettlement(payment);
+        }
 
         // History: CREATED entry
         PaymentStatusHistory createdHistory = new PaymentStatusHistory();
@@ -276,6 +280,9 @@ public class PaymentService {
                     intent.feeCurrency().name(), intent.priority().name(),
                     intent.allowedAlternatives().stream().map(Enum::name).sorted().collect(Collectors.joining(",")),
                     intent.confirmed().toString());
+        }
+        if (request.getIntent() != null && request.getIntent().settlement() != null) {
+            canonical += "|explicit-settlement-v1|" + request.getIntent().settlement().fingerprintMaterial();
         }
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");

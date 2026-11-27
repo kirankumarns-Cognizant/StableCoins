@@ -1,5 +1,9 @@
 # Visa Simulator
 
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
 ## Objective
 
 Represent the Visa integration boundary without requiring live Visa

@@ -1,2 +1,2 @@
 package com.cognizant.stablecoins.ledger.domain;
-public enum SupportedAsset { USD, USDC, ETH, INR }
+public enum SupportedAsset { USD, USDC, ETH, INR, DEMOUSD, BESU_GAS }

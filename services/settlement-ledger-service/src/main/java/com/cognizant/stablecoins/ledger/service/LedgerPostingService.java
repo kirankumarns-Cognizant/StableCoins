@@ -133,6 +133,25 @@ public class LedgerPostingService {
         if (request.getDescription() != null && request.getDescription().length() > 255) throw invalid("description is too long");
         if (request.getEntries() == null || request.getEntries().size() < 2 || request.getEntries().size() > 100)
             throw invalid("journal must contain at least two entries and at most 100");
+        // New private assets always require network-qualified provenance; public validation is unchanged.
+        boolean privateAsset=request.getEntries().stream().filter(Objects::nonNull)
+                .anyMatch(line->Set.of("DEMOUSD","BESU_GAS").contains(Objects.toString(line.getAsset(),"")));
+        if(privateAsset) {
+            var evidence=request.getEvidence();
+            if(evidence==null || evidence.privateSettlement()==null ||
+                    (evidence.mode()!=com.cognizant.stablecoins.ledger.accounting.PostingEvidence.Mode.PRIVATE_DEMO &&
+                     evidence.mode()!=com.cognizant.stablecoins.ledger.accounting.PostingEvidence.Mode.SIMULATED))
+                throw invalid("PRIVATE_ASSET_PROVENANCE_REQUIRED");
+            var execution=com.cognizant.stablecoins.flow.SettlementBindingJson.read(evidence.privateSettlement().executionDocument(),
+                    com.cognizant.stablecoins.flow.SettlementBinding.Execution.class);
+            if(!execution.instruction().paymentId().equals(request.getPaymentId()) ||
+                    !execution.instruction().correlationId().equals(request.getCorrelationId()))
+                throw invalid("PRIVATE_ASSET_PAYMENT_SCOPE_MISMATCH");
+            String asset=request.getEntries().stream().filter(Objects::nonNull).map(JournalEntryRequest::getAsset)
+                    .filter(a->"DEMOUSD".equals(a)||"BESU_GAS".equals(a)).findFirst().orElseThrow();
+            if(request.getEntries().stream().filter(Objects::nonNull).anyMatch(line->!asset.equals(line.getAsset())))
+                throw invalid("PRIVATE_ASSET_JOURNAL_MIXED_ASSETS");
+        }
         for (JournalEntryRequest line : request.getEntries()) {
             if (line == null || line.getAccountCode() == null || !line.getAccountCode().matches("[A-Za-z0-9]{1,10}"))
                 throw invalid("accountCode is required");
@@ -144,7 +163,7 @@ public class LedgerPostingService {
             if (dr.signum() == 0 && cr.signum() == 0) throw invalid("entry must have one positive side");
             for (BigDecimal value : List.of(dr, cr)) {
                 BigDecimal normalized = value.stripTrailingZeros();
-                if (normalized.scale() > 18 || normalized.precision() - normalized.scale() > 20)
+                if (normalized.scale() > ("DEMOUSD".equals(line.getAsset())?6:18) || normalized.precision() - normalized.scale() > 20)
                     throw invalid("AMOUNT_PRECISION_EXCEEDED");
             }
         }

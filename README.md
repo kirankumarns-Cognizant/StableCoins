@@ -1,14 +1,18 @@
 # Stablecoin Intelligent Payment Orchestration POC
 
-Current delivery status (2026-11-15): **9 of 11 steps code-complete**.
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](docs/40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
+Current work is tracked in the [implementation backlog](docs/40-IMPLEMENTATION-BACKLOG.md).
 Connected UI setup and exact screen actions are in [the step-9 guide](docs/32-CONNECTED-REACT-WORKSPACE.md).
-Live AWS/provider/testnet acceptance and the final Word document remain in steps 10-11.
+A public Base Sepolia payment has completed; Besu end-to-end acceptance, further provider/AWS gates and the final Word document remain separately tracked.
 
 ## Demo operations and current status
 
 Start with the [central demo SOP and command index](docs/37-DEMO-OPERATIONS-SOP.md)
 and [latest POC activity checkpoint](docs/36-POC-ACTIVITY-STATUS.md).
-The dated delivery statement above is historical; current evidence and remaining
+Earlier delivery counts in detailed plans are historical; current evidence and remaining
 acceptance gates are recorded in those documents.
 
 ## Overview
@@ -305,6 +309,10 @@ The POC is complete when a developer can:
 
 ## Living solution documentation
 
+The [personal learning knowledgebase](docs/41-KNOWLEDGE-NOTES.md) retains learning
+questions and plain-language answers, examples and comparison tables, including
+EVM, AWS hosting, token standards and settlement versus stablecoin issuance.
+
 The [architecture and design](docs/28-SOLUTION-ARCHITECTURE-AND-DESIGN.md) and
 [complete feature demonstration runbook](docs/29-PROTOTYPE-EXECUTION-RUNBOOK.md)
 cover previous, current and subsequent implementation increments. Applicable
@@ -364,3 +372,5 @@ screen/role/context/click/outcome instructions. [The proof package](docs/35-HACK
 covers two customer policies, a comparable baseline, simulated disruption and
 commercial hypotheses. Step 11 preparation is in progress before AWS deployment;
 genuine connected evidence and the rendered final Word document remain pending.
+
+Step-by-step presenter procedure with database queries and real testnet receipt checks: [Copy-and-paste demo walkthrough](docs/38-COPY-PASTE-DEMO-WALKTHROUGH.md).

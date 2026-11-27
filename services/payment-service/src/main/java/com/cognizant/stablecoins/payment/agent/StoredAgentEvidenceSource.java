@@ -36,6 +36,7 @@ public class StoredAgentEvidenceSource implements AgentEvidenceSource {
             throw new AgentFailure("AGENT_SOURCE_SUPERSEDED");
         if(!payment.getIntent().equals(r.document.intent())||!payment.getIntent().policy().equals(policies.getPolicies().get(actor.customerId())))
             throw new AgentFailure("AGENT_INTENT_OR_POLICY_CHANGED");
+        if(r.document.settlementQuote()!=null)throw new AgentFailure("AGENT_PRIVATE_REVIEW_UNSUPPORTED");
         var c=r.document.context();
         if(!c.paymentId().equals(paymentId)||!c.correlationId().equals(payment.getCorrelationId())||!c.customerId().equals(actor.customerId())
                 ||c.sourceAmountUsd().compareTo(payment.getAmount())!=0||!c.requestedRail().name().equals(payment.getPaymentRail()))

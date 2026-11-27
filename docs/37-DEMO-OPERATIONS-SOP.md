@@ -1,7 +1,21 @@
 # StableFlow demo standard operating procedure
 
-Updated: 2026-11-23. Audience: demo operator, independent approvers and supporting engineers.
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
+Updated: 2026-11-25. Audience: demo operator, independent approvers and supporting engineers.
 Environment for command examples: Bash, repository root in GitHub Codespaces.
+
+For the ordered copy-and-paste UI/DB/testnet presentation, use
+[the executable demo walkthrough](38-COPY-PASTE-DEMO-WALKTHROUGH.md). It includes
+start, stop, restart recovery, SQL at every payment stage and receipt verification.
+
+For staged Besu application build/start/stop/resume commands and the protected
+terminal-variable file, use [the isolated Besu application guide](../infrastructure/besu/APPLICATION.md).
+This is an engineering acceptance procedure: private customer instruction creation
+remains disabled pending B07-B10 acceptance. It preserves the explicitly selected
+public mode and must not be substituted for the accepted public-testnet walkthrough.
 
 ## 1. Context, purpose and scope
 
@@ -25,6 +39,12 @@ architecture. A procedure being documented is not proof it has executed.
 | REAL_TESTNET blockchain | Actual public-testnet transaction when deliberately configured and independently verified |
 | USDC-to-fiat, Visa and beneficiary bank credit | Optional simulated payout |
 | Runtime AI | Separate opt-in evidence gate; deterministic ranking is not an AI call |
+
+The separate [Visa wallet provider simulator](39-VISA-WALLET-SIMULATOR.md) now
+supports internal simulated token-wallet payouts alongside fiat simulation.
+It is disabled by default and is not connected to customer routing/execution yet.
+Its provider status never proves a blockchain transfer. Dedicated Besu credential
+creation is an explicit operator step; see [checked setup](../infrastructure/besu/CREDENTIAL-SETUP.md).
 
 A blockchain receipt is not the application ledger. Accounting must balance per
 asset, and corrections use reversals/compensating entries. Posted entries stay
@@ -68,7 +88,14 @@ flowchart TB
 
 The adapter branches are configuration alternatives in the current implementation,
 not simultaneous per-payment network routing. The existing service is configured
-for one adapter/network. Private Besu support is a future additive proposal.
+for one adapter/network. ADR-016 now accepts an additive private Besu path. Its isolated setup foundation
+is documented in [the Besu setup guide](../infrastructure/besu/README.md); payment
+integration and policy routing are not enabled yet. The dedicated Java adapter and
+encrypted signer are implemented; [runtime checks and acceptance commands](../infrastructure/besu/RUNTIME.md)
+separate local fixture tests from the outstanding live private-chain gate.
+The internal [Besu quote/review and independent approval integration](../infrastructure/besu/APPROVAL-REVIEWS.md)
+is implemented; private execution, accounting and reconciliation acceptance remain
+required before activation.
 The diagram summarizes messaging/data boundaries; internal authenticated HTTP
 calls also exist. Cognito is external to the local stack.
 
@@ -87,9 +114,9 @@ flowchart LR
 ~~~
 
 This is the approved target, not a statement that AWS application deployment or
-Secrets Manager/KMS-backed signing has been accepted. Current local signing uses
-an environment key; direct encrypted-keystore support and AWS signing remain
-explicit work items. Application lifecycle commands here operate the local stack,
+Secrets Manager/KMS-backed signing has been accepted. Current local signing supports a verified encrypted V3 keystore plus protected
+password file through an explicit TESTNET overlay. AWS secret-backed signing
+remains a separate work item. Application lifecycle commands here operate the local stack,
 not AWS resources.
 
 ### 2.3 Financial journey and optional branch
@@ -276,24 +303,19 @@ recovery rule. Complete one step's postcondition before continuing.
 ## 5. Current activity checkpoint
 
 Read [POC activity status](36-POC-ACTIVITY-STATUS.md) before choosing the next action.
-Owner evidence establishes a USD 1,000 MOCK wallet payment through RECONCILED,
-CONFIRMED execution and two approvals. A subsequent stop reported 9/9 components
-stopped. Later PostgreSQL output explicitly identified that transaction as MOCK;
-its hash and block were synthetic. These observations are historical snapshots,
-not a claim about the stack's present running state.
+The owner supplied Nov 25 evidence of a new 1-test-USDC payment: two approvals,
+encrypted treasury signing in REAL_TESTNET mode, LIVE/CONFIRMED database records,
+a successful Base Sepolia explorer token Transfer, receipt-fee settlement and a
+RECONCILED application journey. This is owner-provided runtime/explorer evidence,
+not an independent agent rerun. The older USD 1,000 MOCK result remains historical
+synthetic evidence and must not be presented as the real transfer.
 
-The active next milestone is a new, initially 1-test-USDC payment on Base Sepolia.
-The owner reports two disposable encrypted wallets created. Funding, signer
-integration, explicit testnet activation and public receipt verification are
-pending. Keep actual run IDs, wallet addresses and private evidence in ignored
-.local/poc-status/ or the owner's approved private record, not this shared SOP.
-
-The existing local signer accepts an environment private key; direct encrypted
-keystore loading has not been implemented. Normal Compose explicitly forces MOCK
-and testnet-off. No ready-to-run live activation command is claimed here.
-Besu is a future additive network proposal; it is not currently implemented or
-an alternative proof of the public-testnet requirement. An ADR is required first.
-
+Keep actual IDs, wallet addresses and raw evidence in the ignored private handover.
+The completed payment is audit history: do not execute it again.
+Use a fresh instruction for a new demonstration, following the
+[copy-and-paste walkthrough](38-COPY-PASTE-DEMO-WALKTHROUGH.md).
+Base Sepolia remains the current adapter; Besu requires an additive reviewed ADR.
+AWS deployment, runtime AI, primary amount and optional payout retain separate gates.
 
 ## 6. Operational command reference
 
@@ -380,7 +402,8 @@ old log. The obsolete Compose version warning alone is not a failed payment.
 
 ## 8. Real Base Sepolia preparation and acceptance
 
-This is the next activity, not a record of executed public-testnet acceptance.
+Use this as setup/acceptance reference for subsequent runs. The observed first
+real testnet checkpoint is recorded in section 5 and the activity status.
 
 1. Use dedicated testnet wallets and privately retain encrypted keystores/passwords.
    Never use the known dummy MOCK signing key or real financial assets.
@@ -564,7 +587,7 @@ feature flags or bypass approvals.
 
 ~~~bash
 docker compose logs --no-color --tail 200 blockchain-service |
-  rg 'keystore_signer_verified|mode_real_testnet|TESTNET_|PUBLIC_TESTNET_|FILE_KEYSTORE_'
+  grep -E 'keystore_signer_verified|mode_real_testnet|TESTNET_|PUBLIC_TESTNET_|FILE_KEYSTORE_'
 ~~~
 
 Require keystore_signer_verified for the expected public address and
@@ -576,3 +599,13 @@ allowance; it is not a measured complete Base L1/operator fee quote.
 
 AWS execution remains a separate gate requiring the approved Secrets Manager/KMS
 integration; do not mount this local password file into ECS or bake it into an image.
+
+### Besu credentials and simulated Visa balance evidence
+
+Use [dedicated credential setup](../infrastructure/besu/CREDENTIAL-SETUP.md) for
+interactive Windows or Codespaces creation. The settings do not create files.
+Preserve existing verified pairs and resume password setup without regeneration.
+Use [calculated Visa balances](39-VISA-WALLET-SIMULATOR.md#calculated-balance-evidence)
+for provider-only before/after totals, reservations, credits, queries and limits.
+SIMULATED recipient credits are not external chain balances. This increment does
+not activate customer Besu execution or create a public gateway endpoint.

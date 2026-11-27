@@ -54,4 +54,8 @@ class PaymentFlowServiceTest {
   service.advance(id);verifyNoInteractions(accounts,outbox,approvals);assertThat(account.getBalance()).isEqualByComparingTo("20000");
  }
 
+
+ void markExplicit(){var old=p.getIntent();var i=old.instruction();var selected=new com.cognizant.stablecoins.payment.api.dto.PaymentIntentRequest(i.requiredOutcome(),i.deliverBy(),i.maximumFee(),i.feeCurrency(),i.priority(),i.allowedAlternatives(),i.confirmed(),new com.cognizant.stablecoins.payment.settlement.SettlementSelection("base-sepolia","0x"+"a".repeat(40),p.getAmount()));p.setIntent(new PaymentIntentSnapshot(old.intentId(),old.intentVersion(),old.customerId(),old.confirmedBy(),old.confirmedAt(),old.settlementAsset(),old.fundingSimulated(),old.fiatPayoutSimulated(),selected,old.policy()));}
+ @Test void explicitSelectionCannotEnterLegacyPreparationOrExecution(){markExplicit();assertThatThrownBy(()->service.prepare(p.getPaymentId(),UUID.randomUUID(),IntentFixtures.ACTOR)).extracting("errorCode").isEqualTo("SETTLEMENT_WORKFLOW_ACCEPTANCE_PENDING");assertThatThrownBy(()->service.execute(p.getPaymentId(),recId,id,1,quote.quoteId(),1,IntentFixtures.ACTOR)).extracting("errorCode").isEqualTo("SETTLEMENT_WORKFLOW_ACCEPTANCE_PENDING");verifyNoInteractions(accounts,outbox,approvals);verify(jdbc,never()).update(anyString(),any(Object[].class));}
+ @Test void explicitSelectionCannotDebitUsdThroughLegacyWorker(){markExplicit();assertThatThrownBy(()->service.advance(id)).extracting("errorCode").isEqualTo("SETTLEMENT_WORKFLOW_ACCEPTANCE_PENDING");verifyNoInteractions(accounts,outbox,approvals);assertThat(account.getBalance()).isEqualByComparingTo("20000");}
 }

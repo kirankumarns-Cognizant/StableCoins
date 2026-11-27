@@ -109,12 +109,27 @@ public class EventingConfig {
             Map<String, String> queueMap = new java.util.HashMap<>();
             queueMap.put("PaymentCreated", base + paymentCreatedQueue);
             queueMap.put("StablecoinFundingCompleted", base + ledgerFundingQueue);
+            if (environment.getProperty("app.besu.funding-events.enabled", Boolean.class, false)) {
+                String queue = environment.getRequiredProperty("app.sqs.besu-ledger-funding-queue-name");
+                if (queue.isBlank() || queue.equals(ledgerFundingQueue))
+                    throw new IllegalStateException("Dedicated Besu funding queue required");
+                queueMap.put("BesuFundingAuthorized", base + queue);
+            }
             queueMap.put("ComplianceCompleted", base + complianceCompletedQueue);
             for (String type : com.cognizant.stablecoins.payment.approval.RoutingDecisionEvents.TYPES)
                 queueMap.put(type, base + routingDecisionsQueue);
             for(String type:java.util.List.of("SettlementCompleted","ReconciliationCompleted"))queueMap.put(type,base+routingDecisionsQueue);
+            // Audit notifications only. Private continuation polls committed owner evidence, not legacy commands.
+            if(environment.getProperty("app.besu.closure.enabled",Boolean.class,false))
+                for(String type:java.util.List.of("BesuBlockchainTransactionSubmitted","BesuBlockchainTransactionConfirmed",
+                        "BesuSettlementCompleted","BesuReconciliationRequested","BesuReconciliationCompleted"))
+                    queueMap.put(type,base+routingDecisionsQueue);
+            if(environment.getProperty("app.besu.recovery.enabled",Boolean.class,false))
+                for(String type:java.util.List.of("BesuPaymentFailed","BesuCompensationAuthorized"))
+                    queueMap.put(type,base+routingDecisionsQueue);
             var publisher=new LocalSqsEventPublisher(sqsClient, objectMapper, queueMap);
             if(environment.getProperty("app.flow.enabled",Boolean.class,false)) publisher.withFanoutRoutes(Map.of(
+                "SettlementObservationRequested",java.util.List.of(base+environment.getRequiredProperty("app.sqs.flow-treasury-queue-name")),
                 "RoutingEvidenceRequested",java.util.List.of(base+environment.getRequiredProperty("app.sqs.flow-quote-queue-name"),base+environment.getRequiredProperty("app.sqs.flow-treasury-queue-name")),
                 "StablecoinExecutionRequested",java.util.List.of(base+environment.getRequiredProperty("app.sqs.flow-validation-queue-name"),base+environment.getRequiredProperty("app.sqs.flow-reservation-queue-name"),base+environment.getRequiredProperty("app.sqs.visa-payout-queue-name")),
                 "BlockchainSubmissionRequested",java.util.List.of(base+environment.getRequiredProperty("app.sqs.flow-submission-queue-name")),
@@ -125,6 +140,12 @@ public class EventingConfig {
             return publisher;
         }
         // AWS: publish via EventBridge → SQS routing rules (CDK)
-        return new AwsEventBridgePublisher(eventBridgeClient, objectMapper, eventBusName, eventSource);
+        var publisher = new AwsEventBridgePublisher(eventBridgeClient, objectMapper, eventBusName, eventSource);
+        return event -> {
+            if ("BesuFundingAuthorized".equals(event.getEventType()) &&
+                    !environment.getProperty("app.besu.funding-events.enabled", Boolean.class, false))
+                throw new IllegalStateException("Besu funding transport disabled");
+            publisher.publish(event);
+        };
     }
 }

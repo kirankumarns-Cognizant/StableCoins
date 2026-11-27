@@ -80,7 +80,8 @@ export class InfrastructureStack extends cdk.Stack {
         source: ['stablecoins.payment-service'],
         detailType: ['RoutingRecommendationProposed', 'RoutingQuoteAccepted', 'RoutingApprovalRecorded',
           'RoutingRecommendationApproved', 'RoutingRecommendationRejected',
-          'RoutingRecommendationExpired', 'RoutingRecommendationSuperseded', 'RoutingRecommendationExecuted', 'SettlementCompleted', 'ReconciliationCompleted'],
+          'RoutingRecommendationExpired', 'RoutingRecommendationSuperseded', 'RoutingRecommendationExecuted',
+          'SettlementRecommendationProposed', 'SettlementQuoteAccepted', 'SettlementApprovalRecorded', 'SettlementRecommendationApproved', 'SettlementRecommendationRejected', 'SettlementRecommendationExpired', 'SettlementRecommendationSuperseded', 'SettlementCompleted', 'ReconciliationCompleted'],
       },
       targets: [new targets.SqsQueue(routingDecisionsQueue, { message: events.RuleTargetInput.fromEventPath('$.detail') })],
     });
@@ -143,6 +144,31 @@ export class InfrastructureStack extends cdk.Stack {
       });
     }
 
+    // Private funding is a separate, explicitly enabled delivery contract; never reuse USDC queues.
+    if (connections['app.besu.funding-events.enabled'] === 'true') {
+      const queueName = connections['app.sqs.besu-ledger-funding-queue-name'];
+      const dlqName = connections['app.sqs.besu-ledger-funding-dlq-name'];
+      const existingNames = Object.entries(connections).filter(([key]) => key.startsWith('app.sqs.') &&
+        !key.startsWith('app.sqs.besu-ledger-funding-')).map(([, value]) => value);
+      if (!queueName || !dlqName || queueName === dlqName || existingNames.includes(queueName) || existingNames.includes(dlqName))
+        throw new Error('Dedicated Besu funding queue and DLQ required');
+      const dlq = new sqs.Queue(this, 'BesuLedgerFundingDlq', {
+        queueName: dlqName, retentionPeriod: cdk.Duration.days(14),
+        encryption: sqs.QueueEncryption.SQS_MANAGED, enforceSSL: true,
+      });
+      const queue = new sqs.Queue(this, 'BesuLedgerFundingQueue', {
+        queueName, visibilityTimeout: cdk.Duration.seconds(120),
+        encryption: sqs.QueueEncryption.SQS_MANAGED, enforceSSL: true,
+        deadLetterQueue: { queue: dlq, maxReceiveCount: 3 },
+      });
+      new events.Rule(this, 'BesuLedgerFundingRule', {
+        eventBus: paymentBus,
+        eventPattern: { source: ['stablecoins.payment-service'], detailType: ['BesuFundingAuthorized'],
+          detail: { eventType: ['BesuFundingAuthorized'], eventVersion: ['1.0'] } },
+        targets: [new targets.SqsQueue(queue, { message: events.RuleTargetInput.fromEventPath('$.detail') })],
+      });
+    }
+
     // Fanout commands have one durable queue per owner consumer. Partial delivery is safe to replay.
     const flowRoutes = [
       { id: 'FlowEvidence', type: 'RoutingEvidenceRequested', queues: ['flow-quote', 'flow-treasury'] },
@@ -160,6 +186,13 @@ export class InfrastructureStack extends cdk.Stack {
           deadLetterQueue: { queue: dlq, maxReceiveCount: 3 },
           encryption: sqs.QueueEncryption.SQS_MANAGED, enforceSSL: true,
         });
+        if (name === 'flow-treasury') {
+          new events.Rule(this, 'BesuObservationRule', {
+            eventBus: paymentBus,
+            eventPattern: { source: ['stablecoins.payment-service'], detailType: ['SettlementObservationRequested'] },
+            targets: [new targets.SqsQueue(queue, { message: events.RuleTargetInput.fromEventPath('$.detail') })],
+          });
+        }
         return new targets.SqsQueue(queue, { message: events.RuleTargetInput.fromEventPath('$.detail') });
       });
       new events.Rule(this, `${route.id}Rule`, {

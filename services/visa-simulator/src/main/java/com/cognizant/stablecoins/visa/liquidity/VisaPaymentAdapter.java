@@ -2,7 +2,7 @@ package com.cognizant.stablecoins.visa.liquidity;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
-/** Internal SIMULATED provider liquidity boundary. Actual payout operations will extend this contract. */
+/** Internal SIMULATED provider boundary. Fiat and token-wallet delivery are distinct capabilities. */
 public interface VisaPaymentAdapter {
     enum Currency { USD, INR }
     record Balance(String providerId,Currency currency,BigDecimal total,BigDecimal reserved,BigDecimal available,
@@ -19,4 +19,12 @@ public interface VisaPaymentAdapter {
     Reservation pin(UUID reservationId);
     Reservation cancel(UUID reservationId);
     Reservation resolve(UUID reservationId,boolean consumed);
+    WalletPayouts.Balance walletBalance(String providerId, com.cognizant.stablecoins.flow.SettlementNetwork.Token token);
+    WalletPayouts.Balance prefundWallet(UUID operationId, String providerId,
+            com.cognizant.stablecoins.flow.SettlementNetwork.Token token, BigDecimal amount);
+    WalletPayouts.Payout createWalletPayout(WalletPayouts.Request request);
+    WalletPayouts.Payout walletPayout(UUID payoutId);
+    WalletPayouts.Statement walletPayoutStatement(UUID payoutId);
+    WalletPayouts.Payout finishWalletPayout(UUID payoutId);
+    WalletPayouts.Payout resolveWalletPayout(UUID payoutId, UUID resolutionId, boolean succeeded);
 }

@@ -1,5 +1,9 @@
 # Hackathon proof and reusable offering
 
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
 Updated 2026-11-15. Status: **PREPARATION IN PROGRESS**. This package moves step 11
 ahead of application deployment to AWS at the owner's request. It does not mark
 unexecuted live acceptance complete. Launch prerequisites are in

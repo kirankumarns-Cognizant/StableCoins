@@ -1,0 +1,54 @@
+# Application overlay only. The chain keeps its separate stablecoins-besu project.
+# Use application.cjs; normal application startup never includes this file.
+services:
+  payment-service:
+    environment:
+      CONNECTIONS_CONFIG: file:/app/config/connections.properties,file:/app/config/besu.properties
+      BESU_APPLICATION_API_ENABLED: "${BESU_APPLICATION_API_ENABLED:-false}"
+      BESU_OBSERVATION_API_ENABLED: "${BESU_OBSERVATION_API_ENABLED:-false}"
+      BESU_FUNDING_ENABLED: "${BESU_FUNDING_ENABLED:-false}"
+      BESU_FUNDING_WORKERS_ENABLED: "${BESU_FUNDING_WORKERS_ENABLED:-false}"
+      BESU_CLOSURE_ENABLED: "${BESU_CLOSURE_ENABLED:-false}"
+      BESU_CLOSURE_WORKERS_ENABLED: "${BESU_CLOSURE_WORKERS_ENABLED:-false}"
+      BESU_RECOVERY_ENABLED: "${BESU_RECOVERY_ENABLED:-false}"
+      BESU_RECOVERY_WORKERS_ENABLED: "${BESU_RECOVERY_WORKERS_ENABLED:-false}"
+    volumes:
+      - ${BESU_APPLICATION_PROPERTIES:?Use application.cjs prepare}:/app/config/besu.properties:ro
+  blockchain-service:
+    user: "${BESU_LOCAL_UID:?Use application.cjs}:${BESU_LOCAL_GID:?Use application.cjs}"
+    environment:
+      BESU_PRIVATE_DEMO_ENABLED: "${BESU_PRIVATE_DEMO_ENABLED:-false}"
+      BESU_RPC_URL: http://besu-rpc:8545
+      BESU_GENESIS_HASH: "${BESU_GENESIS_HASH:?}"
+      BESU_TOKEN_CONTRACT: "${BESU_TOKEN_CONTRACT:?}"
+      BESU_TOKEN_CODE_HASH: "${BESU_TOKEN_CODE_HASH:?}"
+      BESU_TREASURY_ADDRESS: "${BESU_TREASURY_ADDRESS:?}"
+      BESU_RECIPIENT_ADDRESSES: "${BESU_RECIPIENT_ADDRESSES:?}"
+      BESU_VALIDATOR_ADDRESSES: "${BESU_VALIDATOR_ADDRESSES:?}"
+      BESU_KEYSTORE_FILE: /run/secrets/besu_treasury_keystore
+      BESU_PASSWORD_FILE: /run/secrets/besu_treasury_password
+      BESU_WORKERS_ENABLED: "${BESU_WORKERS_ENABLED:-false}"
+      BESU_WORKER_SUBMISSION_ENABLED: "${BESU_WORKER_SUBMISSION_ENABLED:-false}"
+      BESU_FUNDING_WORKERS_ENABLED: "${BESU_FUNDING_WORKERS_ENABLED:-false}"
+    secrets: [besu_treasury_keystore, besu_treasury_password]
+    networks: [stablecoins-net, besu-application]
+  settlement-ledger-service:
+    environment:
+      BESU_ACCOUNTING_ENABLED: "${BESU_ACCOUNTING_ENABLED:-false}"
+      BESU_FUNDING_EVENTS_ENABLED: "${BESU_FUNDING_EVENTS_ENABLED:-false}"
+      BESU_ACCOUNTING_WORKERS_ENABLED: "${BESU_ACCOUNTING_WORKERS_ENABLED:-false}"
+      BESU_RECOVERY_ENABLED: "${BESU_RECOVERY_ENABLED:-false}"
+      BESU_RECOVERY_WORKERS_ENABLED: "${BESU_RECOVERY_WORKERS_ENABLED:-false}"
+  reconciliation-service:
+    environment:
+      BESU_RECONCILIATION_ENABLED: "${BESU_RECONCILIATION_ENABLED:-false}"
+      BESU_CLOSURE_WORKERS_ENABLED: "${BESU_CLOSURE_WORKERS_ENABLED:-false}"
+secrets:
+  besu_treasury_keystore:
+    file: "${BESU_HOST_KEYSTORE_FILE:?Use application.cjs prepare}"
+  besu_treasury_password:
+    file: "${BESU_HOST_PASSWORD_FILE:?Use application.cjs prepare}"
+networks:
+  besu-application:
+    external: true
+    name: stablecoins-besu_besu-private

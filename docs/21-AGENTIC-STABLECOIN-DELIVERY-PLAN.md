@@ -1,5 +1,9 @@
 # Agentic Stablecoin Product: Sequential Delivery Plan
 
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
 Current delivery status (2026-11-15): **9 of 11 steps code-complete**.
 Connected UI setup and exact screen actions are in [the step-9 guide](32-CONNECTED-REACT-WORKSPACE.md).
 The owner has moved step 11 preparation and Codespaces acceptance ahead of AWS deployment. Live identity/model/testnet evidence and the rendered Word document remain completion gates.

@@ -45,6 +45,6 @@ public record IntentDraft(String sourceAmountUsd,BeneficiaryOutcome requiredOutc
     }
     private static void need(Set<Field> seen,Field field){if(!seen.contains(field))throw new AgentFailure("AGENT_UNGROUNDED_INTENT_DRAFT");}
     private static BigDecimal amount(String value){try{String text=value.replace("USD","").replace("$","").replace(",","").strip();if(!text.matches("[0-9]{1,16}(?:\\.[0-9]{1,2})?"))throw new NumberFormatException();return new BigDecimal(text);}catch(Exception e){throw new AgentFailure("AGENT_INVALID_INTENT_DRAFT");}}
-    private static boolean outcomeMention(String text,BeneficiaryOutcome outcome){String t=text.toUpperCase(Locale.ROOT);return switch(outcome){case USDC_WALLET -> t.contains("USDC")&&t.contains("WALLET");case SIMULATED_BANK_INR -> t.contains("INR")&&t.contains("BANK");case SIMULATED_BANK_USD -> t.contains("USD")&&t.contains("BANK");};}
+    private static boolean outcomeMention(String text,BeneficiaryOutcome outcome){String t=text.toUpperCase(Locale.ROOT);return switch(outcome){case TOKEN_WALLET -> false;case USDC_WALLET -> t.contains("USDC")&&t.contains("WALLET");case SIMULATED_BANK_INR -> t.contains("INR")&&t.contains("BANK");case SIMULATED_BANK_USD -> t.contains("USD")&&t.contains("BANK");};}
     private static boolean priorityMention(String text,RoutingPriority priority){String t=text.toLowerCase(Locale.ROOT);return priority==RoutingPriority.LOWEST_COST?t.contains("lowest cost")||t.contains("cheapest"):t.contains("fastest")||t.contains("meet deadline");}
 }

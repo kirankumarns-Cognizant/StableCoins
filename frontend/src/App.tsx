@@ -7,7 +7,8 @@ import {clearPendingLogin,cognitoLogoutUrl,finishLogin,resumeFreshLogin} from '.
 import type {Session} from './lib/auth'
 import {SessionKeeper} from './lib/session'
 import {clearOperation,operation,parseRoute,paymentPath} from './lib/safety'
-import type {AgentRun,Catalog,Evidence,Journey,Payment,Recommendation} from './lib/model'
+import {privatePayment} from './lib/settlement'
+import type {AgentRun,Catalog,Evidence,Journey,Payment,Recommendation,PrivateEvidence} from './lib/model'
 import {Badge,Card} from './components/common'
 import {SignIn,Overview,NewPayment} from './components/Workspace'
 import {PaymentViews} from './components/PaymentViews'
@@ -17,6 +18,7 @@ export default function App(){
  const [session,setSession]=useState<Session|null>(null)
  const [redirecting,setRedirecting]=useState(()=>Boolean(sessionStorage.getItem('stableflow:fresh-login'))&&!new URLSearchParams(location.search).has('code')&&!new URLSearchParams(location.search).has('error'))
  const [catalog,setCatalog]=useState<Catalog|null>(null);const [payment,setPayment]=useState<Payment|null>(null)
+ const [privateEvidence,setPrivateEvidence]=useState<PrivateEvidence|null>(null)
  const [evidence,setEvidence]=useState<Evidence|null>(null);const [review,setReview]=useState<Recommendation|null>(null)
  const [agent,setAgent]=useState<AgentRun|null>(null);const [journey,setJourney]=useState<Journey|null>(null)
  const [hash,setHash]=useState(window.location.hash);const route=parseRoute(hash)
@@ -26,7 +28,7 @@ export default function App(){
  const knownHash=useRef(window.location.hash)
  const epoch=useRef(0);const active=useRef<AbortController|null>(null);const callbackStarted=useRef(false)
  const base=apiRoot(connections.apiBaseUrl,location.origin)
- const reset=useCallback(()=>{keeper.current?.clear();epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setRefreshing(false);setRefreshResult('');setCommandError('');setNotice('')},[])
+ const reset=useCallback(()=>{keeper.current?.clear();epoch.current++;active.current?.abort();setSession(null);setCatalog(null);setPayment(null);setEvidence(null);setPrivateEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setBusy(false);setRefreshing(false);setRefreshResult('');setCommandError('');setNotice('')},[])
  useEffect(()=>{
   const instance=new SessionKeeper(connections.identity,value=>setSession(value),()=>{reset();setError('Session renewal ended. Sign in again to return to this screen; unresolved command keys are retained.')})
   keeper.current=instance
@@ -34,7 +36,7 @@ export default function App(){
  },[reset])
  useEffect(()=>{const handler=()=>{
   const before=parseRoute(knownHash.current),after=parseRoute(location.hash);knownHash.current=location.hash
-  if(before.paymentId!==after.paymentId||before.review!==after.review){epoch.current++;active.current?.abort();setPayment(null);setEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setError('');setCommandError('');setBusy(false);setRefreshing(false);setRefreshResult('')}
+  if(before.paymentId!==after.paymentId||before.review!==after.review){epoch.current++;active.current?.abort();setPayment(null);setEvidence(null);setPrivateEvidence(null);setReview(null);setAgent(null);setJourney(null);setUpdated('');setError('');setCommandError('');setBusy(false);setRefreshing(false);setRefreshResult('')}
   setHash(location.hash)
  };addEventListener('hashchange',handler);return()=>removeEventListener('hashchange',handler)},[])
  useEffect(()=>{window.scrollTo(0,0)},[hash])
@@ -57,13 +59,14 @@ export default function App(){
   const controller=new AbortController();active.current=controller;const generation=epoch.current;setRefreshing(true)
   const get=async<T,>(path:string)=>request<T>(base,await keeper.current!.validToken(),path,{signal:controller.signal})
   try{
-   const c=await get<Catalog>('/payments/workbench');let p:Payment|null=null,e:Evidence|null=null,j:Journey|null=null,r:Recommendation|null=null,a:AgentRun|null=null
+   const c=await get<Catalog>('/payments/workbench');let pe:PrivateEvidence|null=null;let p:Payment|null=null,e:Evidence|null=null,j:Journey|null=null,r:Recommendation|null=null,a:AgentRun|null=null
    if(route.paymentId){const path=paymentPath(route.paymentId);[p,e,j]=await Promise.all([get<Payment>(path),get<Evidence>(path+'/evidence'),get<Journey>(path+'/journey')]);const reviewId=route.review??e.recommendations[0]?.recommendation_id
+    if(privatePayment(p))pe=await get<PrivateEvidence>(path+'/private-settlement');
     if(reviewId){r=await get<Recommendation>(path+'/recommendations/'+encodeURIComponent(String(reviewId)));const run=e.agentRuns.find(run=>run.recommendation_id===reviewId);if(run)a=await get<AgentRun>(path+'/recommendations/'+encodeURIComponent(String(reviewId))+'/agent-runs/'+encodeURIComponent(String(run.run_id)))}
    }
    if(controller.signal.aborted||generation!==epoch.current)return
    const completed=new Date().toISOString()
-   setCatalog(c);setPayment(p);setEvidence(e);setJourney(j);setReview(r);setAgent(a);setUpdated(completed);setError('');setRefreshResult('Evidence refreshed at '+time(completed)+'.')
+   setCatalog(c);setPayment(p);setEvidence(e);setPrivateEvidence(pe);setJourney(j);setReview(r);setAgent(a);setUpdated(completed);setError('');setRefreshResult('Evidence refreshed at '+time(completed)+'.')
   }catch(failure){
    if(controller.signal.aborted||generation!==epoch.current)return
    if(failure instanceof ApiError&&failure.status===401){reset();setError('Session is no longer authorized. Sign in again.');return}
@@ -98,7 +101,7 @@ export default function App(){
   {session&&<p role="status" aria-live="polite" className="muted">{refreshing?'Refreshing application evidence...':refreshResult}</p>}
   {!session?redirecting?<Card title="Opening secure sign-in"><p>Continuing to the identity provider after clearing its browser session.</p></Card>:<SignIn onSession={value=>{epoch.current++;keeper.current!.start(value);setError('')}} onError={setError}/>:<>
    <div className="session-strip"><span><strong>{catalog?.actorId??'Verifying identity...'}</strong> | {catalog?.roles.join(' + ')??'Server membership required'}</span><span>Customer {catalog?.customerId??'pending'} | Last successful refresh {time(updated)}</span><button className="quiet" disabled={busy||refreshing} onClick={()=>void load()}>{refreshing?'Refreshing...':'Refresh'}</button></div>
-   {!catalog?<Card title="Connecting to the application"><p>The API must validate your token and server-managed membership. No demonstration data is substituted if it is unavailable.</p></Card>:route.page==='/payments/new'?<NewPayment key={catalog.customerId} catalog={catalog} enabled={enabled} onCreate={body=>command('/payments',body,'create')}/>:!route.paymentId?<Overview catalog={catalog}/>:payment&&evidence?<PaymentViews payment={payment} evidence={evidence} review={review} agent={agent} journey={journey} tab={route.tab} customerId={catalog.customerId} enabled={enabled} approver={catalog.roles.includes('PAYMENT_APPROVER')} act={act}/>:<Card title="Loading payment evidence"><p>Reading customer-authorized records. Commands remain unavailable until evidence loads.</p></Card>}
+   {!catalog?<Card title="Connecting to the application"><p>The API must validate your token and server-managed membership. No demonstration data is substituted if it is unavailable.</p></Card>:route.page==='/payments/new'?<NewPayment key={catalog.customerId} catalog={catalog} enabled={enabled} onCreate={body=>command('/payments',body,'create')}/>:!route.paymentId?<Overview catalog={catalog}/>:payment&&evidence?<PaymentViews privateEvidence={privateEvidence} payment={payment} evidence={evidence} review={review} agent={agent} journey={journey} tab={route.tab} customerId={catalog.customerId} enabled={enabled} approver={catalog.roles.includes('PAYMENT_APPROVER')} act={act}/>:<Card title="Loading payment evidence"><p>Reading customer-authorized records. Commands remain unavailable until evidence loads.</p></Card>}
   </>}
   <footer>StableFlow | Evidence-led stablecoin settlement | No production money moves in this demonstration.</footer></main></div>
  </div>

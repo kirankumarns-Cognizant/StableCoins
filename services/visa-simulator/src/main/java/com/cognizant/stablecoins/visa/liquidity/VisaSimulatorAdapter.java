@@ -93,6 +93,9 @@ public class VisaSimulatorAdapter implements VisaPaymentAdapter {
         identifier(request.paymentId());identifier(request.correlationId());money(request.amount());
         // Same pocket-first lock order as existing reservation operations; serialize competing creates.
         lockPocket(request.providerId(),request.currency());
+        // Serialize fiat/wallet provider claims for the same payment, including across provider pockets.
+        jdbc.query("select pg_advisory_xact_lock(hashtextextended(?,0))", rs -> {}, "visa-payment:"+request.paymentId());
+        if(Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from visa_wallet_payout where payment_id=?)",Boolean.class,request.paymentId())))throw new IllegalStateException("SIMULATED_PAYOUT_DESTINATION_CONFLICT");
         var reads=new com.cognizant.stablecoins.flow.LifecycleReadModels(jdbc,mapper);var prior=reads.payout(request.paymentId());
         if(prior.isPresent()) {
             var p=prior.get();
@@ -134,6 +137,18 @@ public class VisaSimulatorAdapter implements VisaPaymentAdapter {
     }
     private void payoutState(UUID id,String status){jdbc.update("update visa_transaction set status=?,updated_at=now() where payout_id=?",status,id);auditPayout(id,status);}
     private void auditPayout(UUID id,String status){jdbc.update("insert into visa_payout_audit(payout_id,status) values (?,?)",id,status);log.info("service=visa-simulator event=simulated_payout status={} payoutId={} evidenceMode=SIMULATED",status,id);}
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private VisaWalletSimulator walletSimulator;
+    private VisaWalletSimulator wallets() {
+        if(walletSimulator==null)throw new IllegalStateException("WALLET_SIMULATOR_DISABLED");
+        return walletSimulator;
+    }
+    @Override public WalletPayouts.Balance walletBalance(String provider,com.cognizant.stablecoins.flow.SettlementNetwork.Token token){return wallets().balance(provider,token);}
+    @Override public WalletPayouts.Balance prefundWallet(UUID id,String provider,com.cognizant.stablecoins.flow.SettlementNetwork.Token token,BigDecimal amount){return wallets().prefund(id,provider,token,amount);}
+    @Override public WalletPayouts.Payout createWalletPayout(WalletPayouts.Request request){return wallets().create(request);}
+    @Override public WalletPayouts.Payout walletPayout(UUID id){return wallets().get(id);}
+    @Override public WalletPayouts.Statement walletPayoutStatement(UUID id){return wallets().statement(id);}
+    @Override public WalletPayouts.Payout finishWalletPayout(UUID id){return wallets().finish(id);}
+    @Override public WalletPayouts.Payout resolveWalletPayout(UUID id,UUID resolutionId,boolean succeeded){return wallets().resolve(id,resolutionId,succeeded);}
     private Balance balance(VisaLiquidityPocket pocket) {
         BigDecimal reserved=BigDecimal.ZERO;Instant now=Instant.now();
         for(var r:reservations.findByPocketId(pocket.pocketId)) {

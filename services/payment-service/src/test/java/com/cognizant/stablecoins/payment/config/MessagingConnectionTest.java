@@ -32,6 +32,22 @@ class MessagingConnectionTest {
     }
 
     @Test
+    void privateClosureNotificationsUseAuditQueueOnlyWhenExplicitlyEnabled() {
+        var local=runner.withPropertyValues("connections.aws.endpoint=http://localhost:14566",
+            "app.sqs.routing-decisions-queue-name=private-audit",
+            "app.sqs.payment-created-queue-name=created","app.sqs.compliance-completed-queue-name=compliance");
+        for(boolean enabled:new boolean[]{false,true})local.withPropertyValues("app.besu.closure.enabled="+enabled).run(context->{
+            assertThat(context).hasNotFailed();
+            @SuppressWarnings("unchecked") var queues=(Map<String,String>)ReflectionTestUtils.getField(context.getBean("domainEventPublisher"),"eventTypeToQueueUrl");
+            for(String type:java.util.List.of("BesuBlockchainTransactionSubmitted","BesuBlockchainTransactionConfirmed",
+                    "BesuSettlementCompleted","BesuReconciliationRequested","BesuReconciliationCompleted")) {
+                if(enabled)assertThat(queues).containsEntry(type,"http://localhost:14566/000000000000/private-audit");
+                else assertThat(queues).doesNotContainKey(type);
+            }
+        });
+    }
+
+    @Test
     void awsUsesDefaultCredentialChainRatherThanDummyKeys() {
         runner.withPropertyValues("app.sqs.payment-created-queue-name=customer-created",
                 "app.sqs.compliance-completed-queue-name=customer-completed").run(context -> {

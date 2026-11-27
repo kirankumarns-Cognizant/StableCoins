@@ -291,3 +291,21 @@ It now has three owner deliveries. Five new queue/DLQ pairs bring CDK totals to
 14 rules and 32 queues including DLQs. $.detail targets preserve the domain envelope.
 Out-of-order owner readiness causes retry, never fabricated preceding evidence.
 See [step-8 delivery and recovery](31-SETTLEMENT-PAYOUT-RECONCILIATION.md).
+
+
+## Private Besu funding event (version 1.0)
+
+`BesuFundingAuthorized` is written by the payment owner in the same transaction as
+its simulated USD debit and immutable private funding acknowledgement. It carries
+the mandatory domain envelope plus the qualified execution, execution fingerprint,
+`SIMULATED-BESU-<executionId>` funding reference and `simulated=true` payload.
+The ledger validates the exact committed record before posting the three balanced
+funding/conversion/allocation journals. This event does not authorize a second debit,
+signature or transfer on redelivery.
+
+The default-disabled private queue/DLQ is separate from public USDC funding.
+LocalStack receives the domain envelope; the conditional EventBridge rule selects
+payment-service / BesuFundingAuthorized / 1.0 and delivers `$.detail`. Listener
+errors propagate for retry/redrive. Configuration and acceptance limits are in
+[settlement bindings](../infrastructure/besu/SETTLEMENT-BINDINGS.md); current work
+and runtime acceptance remain backlog B08/B09/B10.

@@ -38,7 +38,7 @@ class LedgerServiceIT {
     int count(){return jdbc.queryForObject("select count(*) from ledger_journal where payment_id=?",Integer.class,c.paymentId());}
     @Test void approvedMigrationsAndAtomicConversionRoundTrip(){var result=accounting.fundAndConvert(c);assertThat(result).hasSize(3);assertThat(count()).isEqualTo(3);
         var loaded=ledger.getJournal(result.get(2).getJournalId());assertThat(loaded.getEvidence().terms()).isEqualTo(c.terms());
-        assertThat(jdbc.queryForObject("select count(*) from ledger_account",Integer.class)).isEqualTo(15);}
+        assertThat(jdbc.queryForObject("select count(*) from ledger_account",Integer.class)).isEqualTo(21);}
     @Test void conversionFailureRollsBackFundingAndBothAssets(){
         jdbc.execute("alter table ledger_journal add constraint test_reject_usdc check (journal_type <> 'CONVERSION_USDC') NOT VALID");
         try{assertThatThrownBy(()->accounting.fundAndConvert(c)).isInstanceOf(RuntimeException.class);assertThat(count()).isZero();

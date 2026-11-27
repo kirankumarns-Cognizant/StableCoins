@@ -394,3 +394,73 @@ and [current activity status](docs/36-POC-ACTIVITY-STATUS.md). Read available ig
 local-only and may not exist in another checkout. Do not publish their contents.
 Record observed results and the next step after material demo activities. Do not
 assume conversation history or a compaction summary contains all runtime evidence.
+
+## 19. Additive Besu implementation
+
+Owner-accepted [ADR-016](adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md)
+authorizes the separate local private-demo Besu network and narrow DEMOUSD
+contract exception. Base Sepolia remains the default public path. Besu setup
+is isolated under infrastructure/besu; runtime integration uses a dedicated
+besu package inside blockchain-service, not another business microservice.
+The orchestrator selects a pre-initialized network; it never deploys per payment
+or changes chains after signing/submission. Do not enable Besu selection until
+its complete approval, accounting and reconciliation path passes acceptance.
+
+## 20. One implementation backlog
+
+Read the [consolidated implementation backlog](docs/40-IMPLEMENTATION-BACKLOG.md) before planning work.
+Record every new TODO, deferred decision and acceptance gap there with a stable ID,
+status and closure criteria. Update it after implementation and validation. Other
+documents may describe designs and dated evidence, but must reference backlog IDs
+instead of maintaining separate current queues. Never close an item solely on
+compilation, skipped tests or historical evidence for another revision.
+
+## 21. Conversation knowledge capture
+
+When project conversations contain substantive learning or conceptual explanations,
+capture the useful content in [knowledge notes](docs/41-KNOWLEDGE-NOTES.md) before
+ending the turn. The owner requested this ongoing local record on 26 November 2026.
+The owner clarified that this is a personal learning knowledgebase: questions such
+as "what is EVM?" and "how do ERC-20, ERC-721 and ERC-1155 differ?", with accessible
+answers, examples and comparison tables. Use the question as a heading, record the
+date learned and sources, and update existing topics with useful follow-ups and
+corrections. Capture conceptual learning embedded in other discussions as well.
+Exclude implementation coverage assessments, completion percentages, test results,
+task lists, routine status chatter, secrets, sensitive PII and private handovers.
+Keep project examples short and clearly labelled. Current TODOs, deferred decisions
+and acceptance gaps stay in the central backlog; operational evidence stays in the
+activity history. Knowledge capture does not authorize new scope or override ADRs.
+No note is required for a purely operational exchange.
+
+### Standing authorization for conversation extracts (26 November 2026)
+
+The owner explicitly authorizes ongoing knowledge capture without asking again.
+Review every project conversation for useful functional-domain, technology and
+tool concepts, including learning embedded in implementation discussions. Summarize
+those concepts in docs/41-KNOWLEDGE-NOTES.md before ending the turn; update an
+existing topic rather than duplicate it. Capture useful explanations and examples,
+not a verbatim transcript. The exclusions and source/date requirements above still
+apply; a purely operational or progress-count exchange needs no learning entry.
+
+### Knowledge scope clarification (26 November 2026)
+
+Also capture learning about what POC functionality means and how it participates
+in the stablecoin value chain: domain workflows, treasury, compliance, accounting,
+reconciliation, tools, technology choices, deployment and enterprise foundations.
+Explain actual functionality with dated source references and distinguish
+implemented behavior, simulated behavior and future design. Keep commands,
+execution procedures, coverage percentages, task status and test results in the
+SOP/activity/backlog instead. Knowledge notes are a learning reference, not only
+a glossary and not a competing operational or implementation register.
+
+## 22. Enterprise foundations: deferred review
+
+The owner requested reusable foundations for logging, auditing, exception/error
+handling, analytics, model token-usage visibility in an app corner, caching,
+notifications and enterprise integration. Reuse existing components and preserve
+service ownership, authorization, idempotency and financial evidence boundaries.
+On 26 November the owner explicitly deferred this review/refactoring until the
+end, to preserve working functionality and continue Besu first. Track this as
+E01-E06 in the central backlog. Do not refactor or enable these features during
+Besu work merely because this principle has been recorded. Evaluate any required
+architecture change through the existing ADR process.

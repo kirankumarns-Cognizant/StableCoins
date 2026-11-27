@@ -1,0 +1,85 @@
+# Standalone infrastructure project. Do NOT append to the application's COMPOSE_FILE.
+# All identities and chain data are generated under ignored .local/besu-network.
+name: stablecoins-besu
+x-node: &node
+  image: hyperledger/besu:26.9.0
+  user: "${BESU_LOCAL_UID:?Use the Besu CLI}:${BESU_LOCAL_GID:?Use the Besu CLI}"
+  restart: unless-stopped
+  mem_limit: 1536m
+  cpus: 1.0
+  environment:
+    JAVA_OPTS: "-Xms256m -Xmx768m"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  logging:
+    options:
+      max-size: "10m"
+      max-file: "3"
+services:
+  besu-validator-1:
+    <<: *node
+    command: ["--config-file=/network/node.toml"]
+    volumes:
+      - ${BESU_STATE_DIR:?}/genesis.json:/network/genesis.json:ro
+      - ${BESU_STATE_DIR:?}/node-1/node.toml:/network/node.toml:ro
+      - ${BESU_STATE_DIR:?}/node-1/key:/identity/key:ro
+      - ${BESU_STATE_DIR:?}/node-1/data:/var/lib/besu
+    networks:
+      besu-private:
+        ipv4_address: 172.30.76.11
+  besu-validator-2:
+    <<: *node
+    command: ["--config-file=/network/node.toml"]
+    volumes:
+      - ${BESU_STATE_DIR:?}/genesis.json:/network/genesis.json:ro
+      - ${BESU_STATE_DIR:?}/node-2/node.toml:/network/node.toml:ro
+      - ${BESU_STATE_DIR:?}/node-2/key:/identity/key:ro
+      - ${BESU_STATE_DIR:?}/node-2/data:/var/lib/besu
+    networks:
+      besu-private:
+        ipv4_address: 172.30.76.12
+  besu-validator-3:
+    <<: *node
+    command: ["--config-file=/network/node.toml"]
+    volumes:
+      - ${BESU_STATE_DIR:?}/genesis.json:/network/genesis.json:ro
+      - ${BESU_STATE_DIR:?}/node-3/node.toml:/network/node.toml:ro
+      - ${BESU_STATE_DIR:?}/node-3/key:/identity/key:ro
+      - ${BESU_STATE_DIR:?}/node-3/data:/var/lib/besu
+    networks:
+      besu-private:
+        ipv4_address: 172.30.76.13
+  besu-validator-4:
+    <<: *node
+    command: ["--config-file=/network/node.toml"]
+    volumes:
+      - ${BESU_STATE_DIR:?}/genesis.json:/network/genesis.json:ro
+      - ${BESU_STATE_DIR:?}/node-4/node.toml:/network/node.toml:ro
+      - ${BESU_STATE_DIR:?}/node-4/key:/identity/key:ro
+      - ${BESU_STATE_DIR:?}/node-4/data:/var/lib/besu
+    networks:
+      besu-private:
+        ipv4_address: 172.30.76.14
+  besu-rpc:
+    <<: *node
+    command: ["--config-file=/network/node.toml"]
+    ports:
+      - "127.0.0.1:8547:8545"
+    volumes:
+      - ${BESU_STATE_DIR:?}/genesis.json:/network/genesis.json:ro
+      - ${BESU_STATE_DIR:?}/node-5/node.toml:/network/node.toml:ro
+      - ${BESU_STATE_DIR:?}/node-5/key:/identity/key:ro
+      - ${BESU_STATE_DIR:?}/node-5/data:/var/lib/besu
+    networks:
+      besu-private:
+        ipv4_address: 172.30.76.15
+networks:
+  besu-private:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.76.0/24

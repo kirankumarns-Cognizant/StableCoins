@@ -19,4 +19,23 @@ class LocalStackInitializerTest {
     }
     @Test void missingLocalEndpointNeverCallsRealAws(){var sqs=mock(SqsClient.class);assertThatThrownBy(()->initializer(sqs,"").init()).hasMessageContaining("refusing AWS queue creation");verifyNoInteractions(sqs);}
     @Test void bootstrapFailureDoesNotReportReady(){var sqs=mock(SqsClient.class);when(sqs.createQueue(any(CreateQueueRequest.class))).thenThrow(SqsException.builder().message("test-only-unavailable").build());assertThatThrownBy(()->initializer(sqs,"http://localhost:4566").init()).isInstanceOf(SqsException.class);}
+    @Test void privateBootstrapAddsIsolatedQueueAndDlqOnlyWhenEnabled(){
+        var sqs=mock(SqsClient.class);
+        when(sqs.createQueue(any(CreateQueueRequest.class))).thenAnswer(i->CreateQueueResponse.builder().queueUrl("http://localhost:4566/000000000000/"+((CreateQueueRequest)i.getArgument(0)).queueName()).build());
+        when(sqs.getQueueAttributes(any(GetQueueAttributesRequest.class))).thenAnswer(i->{String url=((GetQueueAttributesRequest)i.getArgument(0)).queueUrl();return GetQueueAttributesResponse.builder().attributes(java.util.Map.of(QueueAttributeName.QUEUE_ARN,"arn:aws:sqs:us-east-1:000000000000:"+url.substring(url.lastIndexOf('/')+1))).build();});
+        var initializer=initializer(sqs,"http://localhost:4566");
+        org.springframework.test.util.ReflectionTestUtils.setField(initializer,"environment",new org.springframework.mock.env.MockEnvironment()
+            .withProperty("app.besu.funding-events.enabled","true").withProperty("app.sqs.besu-ledger-funding-queue-name","private-funding")
+            .withProperty("app.sqs.besu-ledger-funding-dlq-name","private-funding-dlq"));
+        initializer.init();var requests=ArgumentCaptor.forClass(SetQueueAttributesRequest.class);verify(sqs,times(7)).setQueueAttributes(requests.capture());
+        assertThat(requests.getAllValues().getLast().queueUrl()).endsWith("/private-funding");
+        assertThat(requests.getAllValues().getLast().attributes().get(QueueAttributeName.REDRIVE_POLICY)).contains("private-funding-dlq");
+    }
+    @Test void privateBootstrapRefusesSharedQueueBeforeAnyMutation(){
+        var sqs=mock(SqsClient.class);var initializer=initializer(sqs,"http://localhost:4566");
+        org.springframework.test.util.ReflectionTestUtils.setField(initializer,"environment",new org.springframework.mock.env.MockEnvironment()
+            .withProperty("app.besu.funding-events.enabled","true").withProperty("app.sqs.besu-ledger-funding-queue-name","funding")
+            .withProperty("app.sqs.besu-ledger-funding-dlq-name","private-dlq"));
+        assertThatThrownBy(initializer::init).hasMessageContaining("Dedicated Besu");verifyNoInteractions(sqs);
+    }
 }

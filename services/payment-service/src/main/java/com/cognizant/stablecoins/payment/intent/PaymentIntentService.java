@@ -21,13 +21,25 @@ public class PaymentIntentService {
     private final Validator validator;
     private final RoutingPolicyProperties properties;
     private final Clock clock;
+    private final com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService settlements;
 
-    @Autowired
     public PaymentIntentService(Validator validator, RoutingPolicyProperties properties) {
         this(validator, properties, Clock.systemUTC());
     }
 
     PaymentIntentService(Validator validator, RoutingPolicyProperties properties, Clock clock) {
+        this(validator, properties, clock, null);
+    }
+
+    @Autowired
+    public PaymentIntentService(Validator validator, RoutingPolicyProperties properties,
+            com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService settlements) {
+        this(validator, properties, Clock.systemUTC(), settlements);
+    }
+
+    PaymentIntentService(Validator validator, RoutingPolicyProperties properties, Clock clock,
+            com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService settlements) {
+        this.settlements = settlements;
         this.validator = validator;
         this.properties = properties;
         this.clock = clock;
@@ -74,6 +86,9 @@ public class PaymentIntentService {
         Set<BeneficiaryOutcome> outcomes = new HashSet<>(intent.allowedAlternatives());
         outcomes.add(intent.requiredOutcome());
         policy.requireAllowed(outcomes,intent.maximumFee());
+        // Typed history/reviews are supported, but creation stays closed until full private acceptance.
+        if (outcomes.contains(BeneficiaryOutcome.TOKEN_WALLET))
+            throw invalid("BESU_PAYMENT_ACCEPTANCE_PENDING", "Private token payment acceptance is pending");
         if (intent.allowedAlternatives().contains(intent.requiredOutcome())) {
             throw invalid("REDUNDANT_ALTERNATIVE", "An alternative must differ from the required outcome");
         }
@@ -96,9 +111,22 @@ public class PaymentIntentService {
                 throw invalid("PAYOUT_CURRENCY_MISMATCH", "Beneficiary must support the requested simulated payout currency");
             }
         }
+        var selected = intent.settlement() == null ? null : confirmSettlement(request, actor, beneficiary);
         return new PaymentIntentSnapshot(UUID.randomUUID(), 1, actor.customerId(), actor.actorId(),
                 clock.instant(), SettlementAsset.USDC, true,
-                outcomes.stream().anyMatch(o -> o != BeneficiaryOutcome.USDC_WALLET), intent, policy);
+                outcomes.stream().anyMatch(o -> o != BeneficiaryOutcome.USDC_WALLET), intent, policy, selected);
+    }
+
+    private com.cognizant.stablecoins.payment.settlement.ConfirmedSettlement confirmSettlement(
+            CreatePaymentRequest request, AuthorizedCustomer actor, Beneficiary beneficiary) {
+        if (settlements == null) throw invalid("SETTLEMENT_SELECTION_NOT_CONFIGURED", "Explicit settlement is not configured");
+        return settlements.confirm(request, actor.customerId(), beneficiary.getWalletAddress());
+    }
+
+    public void captureSettlement(com.cognizant.stablecoins.payment.model.Payment payment) {
+        if (!com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.isExplicit(payment)) return;
+        if (settlements == null) throw invalid("SETTLEMENT_SELECTION_NOT_CONFIGURED", "Explicit settlement is not configured");
+        settlements.capture(payment);
     }
 
     private PaymentValidationException invalid(String code, String message) {

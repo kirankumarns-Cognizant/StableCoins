@@ -1,11 +1,15 @@
+import {LedgerBalance} from './LedgerBalance'
+import {PrivatePaymentViews} from './PrivatePaymentViews'
+import {privatePayment} from '../lib/settlement'
 import {connections} from '../config/connections'
 import {time,text} from '../lib/format'
 import {useState} from 'react'
-import type {AgentRun,Evidence,Journey,Payment,Recommendation} from '../lib/model'
-import {balance,decimal,explorer,paymentPath,units} from '../lib/safety'
+import type {AgentRun,Evidence,Journey,Payment,Recommendation,PrivateEvidence} from '../lib/model'
+import {decimal,explorer,paymentPath,units} from '../lib/safety'
 import {Badge,Card,Details,EvidenceSection,Fields} from './common'
 import {Routing} from './Routing'
-export function PaymentViews({payment,evidence,review,agent,journey,tab,customerId,enabled,approver,act}:{payment:Payment;evidence:Evidence;review:Recommendation|null;agent:AgentRun|null;journey:Journey|null;tab:string;customerId:string;enabled:boolean;approver:boolean;act:(path:string,body:unknown,name?:string)=>void}){
+export function PaymentViews({privateEvidence,payment,evidence,review,agent,journey,tab,customerId,enabled,approver,act}:{privateEvidence:PrivateEvidence|null;payment:Payment;evidence:Evidence;review:Recommendation|null;agent:AgentRun|null;journey:Journey|null;tab:string;customerId:string;enabled:boolean;approver:boolean;act:(path:string,body:unknown,name?:string)=>void}){
+ if(privatePayment(payment,review))return <PrivatePaymentViews payment={payment} evidence={evidence} privateEvidence={privateEvidence} review={review} journey={journey} tab={tab} enabled={enabled} approver={approver} act={act}/>
  const path=paymentPath(payment.paymentId)
  const quote=review?.document.quote
  const acceptance=review&&quote?{expectedVersion:review.version,quoteId:quote.quoteId,quoteVersion:quote.version}:null
@@ -24,8 +28,3 @@ export function PaymentViews({payment,evidence,review,agent,journey,tab,customer
  </>
 }
 function Execute({enabled,onExecute}:{enabled:boolean;onExecute:()=>void}){const [confirmed,setConfirmed]=useState(false);return <><label className="checkbox"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I authorize the approved version and understand that TESTNET mode submits a real public transaction.</label><button disabled={!enabled||!confirmed} onClick={onExecute}>Execute approved USDC payment</button></>}
-function LedgerBalance({entries}:{entries:{asset:string;debit:string;credit:string}[]}){
- let totals:Record<string,string>
- try{totals=balance(entries)}catch{return <p className="alert">Exact ledger arithmetic could not be verified. Review the source journal.</p>}
- return <p className="balance">Per-asset debit - credit: {Object.entries(totals).map(([asset,value])=>`${asset} ${value}`).join(' | ')} | {Object.values(totals).every(v=>/^0(\.0+)?$/.test(v))?'BALANCED':'IMBALANCE | REVIEW REQUIRED'}</p>
-}

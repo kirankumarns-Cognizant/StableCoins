@@ -27,6 +27,13 @@ public class RecommendationService {
     private final Clock clock;
     private final AccountRepository accounts;
     private final BeneficiaryRepository beneficiaries;
+    @Autowired(required=false)
+    private com.cognizant.stablecoins.payment.settlement.SettlementReviewGuard settlementReviews;
+    void settlementReviews(com.cognizant.stablecoins.payment.settlement.SettlementReviewGuard guard) { this.settlementReviews=guard; }
+    private com.cognizant.stablecoins.payment.settlement.SettlementReviewGuard settlementGuard() {
+        if(settlementReviews==null) throw conflict("SETTLEMENT_REVIEW_NOT_CONFIGURED");
+        return settlementReviews;
+    }
     @Autowired
     public RecommendationService(PaymentRepository payments, RoutingRecommendationRepository recommendations,
             RoutingDecisionRepository decisions, RoutingAuditRepository audits, OutboxEventRepository outbox,
@@ -47,11 +54,12 @@ public class RecommendationService {
             RoutingEvidence.Snapshot evidence, RecommendationDocument.Quote quote) {
         Objects.requireNonNull(proposalId); Objects.requireNonNull(context);
         Payment payment=lock(context.paymentId(),actor);
+        com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(payment);
         bind(payment,context);
         var existing=recommendations.findById(proposalId);
         if(existing.isPresent()) {
             var previous=existing.get(); authorize(previous,actor);
-            if(!previous.paymentId.equals(payment.getPaymentId()) || !previous.document.context().equals(context)
+            if(!previous.paymentId.equals(payment.getPaymentId()) || !Objects.equals(previous.document.context(),context)
                     || !previous.document.evidence().equals(evidence) || !Objects.equals(previous.document.quote(),quote))
                 throw conflict("PROPOSAL_KEY_CONFLICT");
             expire(previous); return view(previous);
@@ -83,6 +91,45 @@ public class RecommendationService {
         recommendations.save(r);
         change(r,State.PROPOSED,actor.actorId(),"RoutingRecommendationProposed"); expire(r);
         return view(r);
+    }
+    /** Internal Stage A entry point: identifiers only, never caller-supplied quote/evidence. */
+    public RecommendationView proposeSettlement(String paymentId, UUID preparationId, UUID draftId, AuthorizedCustomer actor) {
+        Objects.requireNonNull(preparationId); Objects.requireNonNull(draftId);
+        var payment=lock(paymentId,actor);
+        var quote=settlementGuard().load(paymentId,preparationId,draftId,actor);
+        if(!draftId.equals(quote.review().recommendationId()) || !preparationId.equals(quote.review().preparationId())
+                || !paymentId.equals(quote.review().instruction().paymentId())
+                || !actor.customerId().equals(quote.review().instruction().customerId())) throw conflict("PROPOSAL_KEY_CONFLICT");
+        var existing=recommendations.findById(draftId);
+        if(existing.isPresent()) {
+            var prior=existing.get(); authorize(prior,actor);
+            if(!paymentId.equals(prior.paymentId) || !quote.equals(prior.document.settlementQuote()))
+                throw conflict("PROPOSAL_KEY_CONFLICT");
+            expire(prior); return view(prior); // Replay never reprices or extends expiry.
+        }
+        if(!"COMPLIANCE_APPROVED".equals(payment.getStatus())) throw conflict("COMPLIANCE_OR_EXECUTION_STATE_INVALID");
+        requirePolicy(payment); settlementGuard().validate(payment,quote,clock.instant());
+        var bound=instruction(payment);
+        if(!bound.recipientWallet().equals(quote.review().instruction().recipient())) throw conflict("BENEFICIARY_OR_ACCOUNT_CHANGED");
+        var history=recommendations.findByPaymentIdOrderByVersionDesc(paymentId);
+        for(var previous:history) {
+            expire(previous);
+            if(previous.state==State.APPROVED || previous.state==State.EXECUTED) throw conflict("PRIOR_APPROVAL_UNRESOLVED");
+        }
+        for(var previous:history) if(previous.state==State.PROPOSED)
+            change(previous,State.SUPERSEDED,actor.actorId(),"RoutingRecommendationSuperseded");
+        recommendations.flush();
+        var r=new RoutingRecommendation(); r.id=draftId; r.paymentId=paymentId;
+        r.correlationId=payment.getCorrelationId(); r.customerId=actor.customerId();
+        r.version=history.isEmpty()?1:Math.addExact(history.getFirst().version,1);
+        r.requiredApprovals=payment.getIntent().policy().requiredApprovals();
+        r.state=State.DRAFT; r.createdAt=clock.instant(); r.expiresAt=quote.review().expiresAt();
+        r.document=new RecommendationDocument(payment.getIntent(),null,null,null,null,bound,
+                "Explicit PRIVATE_DEMO DEMOUSD selection; simulated USD provider charge. Independent approval required.",
+                "BESU_EXPLICIT/"+quote.terms().version(),quote);
+        recommendations.save(r);
+        change(r,State.PROPOSED,actor.actorId(),"RoutingRecommendationProposed");
+        recommendations.flush(); expire(r); return view(r);
     }
     /** Select the matching immutable owner quote using the same deterministic assessor as approval. */
     public RecommendationView proposeCaptured(UUID id,AuthorizedCustomer actor,AssessmentContext context,RoutingEvidence.Snapshot evidence,List<RecommendationDocument.Quote> quotes){
@@ -126,11 +173,34 @@ public class RecommendationService {
     public RecommendationView authorizeExecution(String paymentId,UUID id,int version,UUID quoteId,int quoteVersion,AuthorizedCustomer actor) {
         var r=load(paymentId,id,actor);requireVersion(r,version);requireQuoteVersion(r,quoteId,quoteVersion);
         if(r.state!=State.APPROVED || decisions.countByRecommendationIdAndAction(r.id,"APPROVED")<r.requiredApprovals)throw conflict("APPROVAL_REQUIRED");
+        if(r.document.settlementQuote()!=null) throw conflict("SETTLEMENT_EXECUTION_ACCEPTANCE_PENDING");
         revalidate(r,actor);return view(r);
+    }
+    /** Private owner validation only. The claim service must capture independent acceptance/vote evidence. */
+    public RecommendationView authorizeSettlementExecution(String paymentId,UUID id,int version,UUID quoteId,int quoteVersion,AuthorizedCustomer actor) {
+        var r=load(paymentId,id,actor);requireVersion(r,version);requireQuoteVersion(r,quoteId,quoteVersion);
+        if(r.document.settlementQuote()==null) throw conflict("PRIVATE_SETTLEMENT_REVIEW_REQUIRED");
+        if(r.requiredApprovals<2 || r.state!=State.APPROVED
+                || decisions.countByRecommendationIdAndAction(r.id,"APPROVED")<r.requiredApprovals)
+            throw conflict("APPROVAL_REQUIRED");
+        revalidate(r,actor);return view(r);
+    }
+    /** Internal private funding boundary. Caller must verify the immutable claim and current voters. */
+    public void markSettlementExecuted(com.cognizant.stablecoins.flow.SettlementBinding.Execution execution,AuthorizedCustomer actor) {
+        var e=execution; var review=e.review();
+        var r=load(e.instruction().paymentId(),review.recommendationId(),actor);
+        requireVersion(r,review.version());requireQuoteVersion(r,review.quoteId(),review.quoteVersion());
+        if(r.document.settlementQuote()==null || r.state!=State.APPROVED || r.requiredApprovals<2
+                || decisions.countByRecommendationIdAndAction(r.id,"APPROVED")<r.requiredApprovals)
+            throw conflict("APPROVAL_REQUIRED");
+        e.requireSameReview(r.document.settlementReview(r.version));
+        revalidate(r,actor,e);
+        change(r,State.EXECUTED,actor.actorId(),"RoutingRecommendationExecuted");
     }
     public void markExecuted(String paymentId,UUID id,AuthorizedCustomer actor) {
         var r=load(paymentId,id,actor);
         if(r.state!=State.APPROVED)throw conflict("APPROVAL_REQUIRED");
+        if(r.document.settlementQuote()!=null) throw conflict("SETTLEMENT_EXECUTION_ACCEPTANCE_PENDING");
         revalidate(r,actor);change(r,State.EXECUTED,actor.actorId(),"RoutingRecommendationExecuted");
     }
     private Payment lock(String id,AuthorizedCustomer actor) {
@@ -168,14 +238,28 @@ public class RecommendationService {
                 || beneficiary.getWalletAddress().equalsIgnoreCase("0x"+"0".repeat(40))) throw conflict("ACCOUNT_OR_BENEFICIARY_INVALID");
         var outcomes=new java.util.HashSet<>(p.getIntent().instruction().allowedAlternatives());
         outcomes.add(p.getIntent().instruction().requiredOutcome());
-        if(outcomes.stream().anyMatch(o->o!=BeneficiaryOutcome.USDC_WALLET && !o.payoutCurrency().equals(beneficiary.getCurrency())))
+        if(outcomes.stream().anyMatch(o->o!=BeneficiaryOutcome.USDC_WALLET && o!=BeneficiaryOutcome.TOKEN_WALLET && !o.payoutCurrency().equals(beneficiary.getCurrency())))
             throw conflict("PAYOUT_CURRENCY_CHANGED");
         return new RecommendationDocument.InstructionBinding(p.getSenderAccountId(),p.getBeneficiaryId(),
                 beneficiary.getWalletAddress().toLowerCase(java.util.Locale.ROOT),beneficiary.getCurrency());
     }
-    private void revalidate(RoutingRecommendation r,AuthorizedCustomer actor) {
+    private void revalidate(RoutingRecommendation r,AuthorizedCustomer actor) { revalidate(r,actor,null); }
+    private void revalidate(RoutingRecommendation r,AuthorizedCustomer actor,
+            com.cognizant.stablecoins.flow.SettlementBinding.Execution execution) {
         Payment p=payments.findById(r.paymentId).orElseThrow(()->new PaymentNotFoundException(r.paymentId));
         if(!"COMPLIANCE_APPROVED".equals(p.getStatus())) throw conflict("COMPLIANCE_OR_EXECUTION_STATE_INVALID");
+        if(r.document.settlementQuote()!=null) {
+            requirePolicy(p);
+            if(!p.getIntent().equals(r.document.intent())) throw conflict("INTENT_CHANGED");
+            if(!instruction(p).equals(r.document.instruction())) throw conflict("BENEFICIARY_OR_ACCOUNT_CHANGED");
+            var q=r.document.settlementQuote();
+            var canonical=settlementGuard().load(r.paymentId,q.review().preparationId(),r.id,actor);
+            if(!q.equals(canonical)) throw conflict("SETTLEMENT_QUOTE_CHANGED");
+            if(execution==null) settlementGuard().validate(p,q,clock.instant());
+            else settlementGuard().validateClaimed(p,q,execution,clock.instant());
+            return;
+        }
+        com.cognizant.stablecoins.payment.settlement.ExplicitSettlementService.requireLegacyWorkflow(p);
         requirePolicy(p); bind(p,r.document.context());
         if(!instruction(p).equals(r.document.instruction())) throw conflict("BENEFICIARY_OR_ACCOUNT_CHANGED");
         var old=r.document.assessment();
@@ -201,6 +285,11 @@ public class RecommendationService {
                 || q.totalFeeUsd().compareTo(selected.totalCostUsd())!=0) throw conflict("QUOTE_CONTEXT_MISMATCH");
     }
     private void requireQuoteVersion(RoutingRecommendation r,UUID id,int version) {
+        if(r.document.settlementQuote()!=null) {
+            var q=r.document.settlementQuote().review();
+            if(!q.quoteId().equals(id) || q.quoteVersion()!=version) throw conflict("QUOTE_VERSION_MISMATCH");
+            return;
+        }
         var q=r.document.quote();
         if(q==null || !q.quoteId().equals(id) || q.version()!=version) throw conflict("QUOTE_VERSION_MISMATCH");
     }
@@ -227,13 +316,24 @@ public class RecommendationService {
     /** v1 payload: immutable binding plus actor/state. Consumers must not treat this as execution. */
     public record DecisionEvent(UUID recommendationId,int recommendationVersion,UUID intentId,int intentVersion,
             String policyVersion,UUID evidenceSnapshotId,UUID quoteId,Integer quoteVersion,String actorId,State state,Instant expiresAt) { }
+    public record SettlementDecisionEvent(com.cognizant.stablecoins.flow.SettlementBinding.Review review,
+            String customerPolicyVersion, String quotePolicyVersion, String actorId, State state, Instant expiresAt) {}
     private void event(RoutingRecommendation r,String actor,String type) {
+        if(r.document.settlementQuote()!=null) {
+            String privateType="Settlement"+type.substring("Routing".length());
+            var payload=new SettlementDecisionEvent(r.document.settlementReview(r.version),
+                    r.document.intent().policy().version(),r.document.settlementQuote().terms().version(),actor,r.state,r.expiresAt);
+            saveEvent(r,privateType,"1.0",payload); return;
+        }
         var a=r.document.assessment(); var q=r.document.quote();
         var payload=new DecisionEvent(r.id,r.version,a.intentId(),a.intentVersion(),a.policyVersion(),a.evidenceSnapshotId(),
                 q==null?null:q.quoteId(),q==null?null:q.version(),actor,r.state,r.expiresAt);
-        var event=new DomainEvent<>(UUID.randomUUID().toString(),type,"1",r.paymentId,r.correlationId,payload);
+        saveEvent(r,type,"1",payload);
+    }
+    private void saveEvent(RoutingRecommendation r,String type,String version,Object payload) {
+        var event=new DomainEvent<>(UUID.randomUUID().toString(),type,version,r.paymentId,r.correlationId,payload);
         try {
-            var row=new OutboxEvent(); row.setEventId(event.getEventId()); row.setEventType(type); row.setEventVersion("1");
+            var row=new OutboxEvent(); row.setEventId(event.getEventId()); row.setEventType(type); row.setEventVersion(version);
             row.setAggregateId(r.paymentId); row.setCorrelationId(r.correlationId); row.setPayload(mapper.writeValueAsString(event));
             row.setStatus("PENDING"); outbox.save(row);
         } catch(com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("Cannot serialize routing decision",e); }

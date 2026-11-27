@@ -118,4 +118,18 @@ class VisaSimulatorAdapterTest {
         assertThatThrownBy(() -> new VisaSimulatorAdapter(pockets,reservations,funding,audit,Set.of(A),Duration.ZERO)).hasMessage("INVALID_SIMULATOR_CONFIGURATION");
         assertThatThrownBy(() -> new VisaSimulatorAdapter(pockets,reservations,funding,audit,Set.of(),Duration.ofMinutes(1))).hasMessage("INVALID_SIMULATOR_CONFIGURATION");
     }
+    @Test void walletFeatureIsDisabledWithoutChangingFiatCapability() {
+        assertThatThrownBy(() -> adapter.createWalletPayout(null)).hasMessage("WALLET_SIMULATOR_DISABLED");
+        adapter.prefund("FIAT-STILL-WORKS",A,USD,new BigDecimal("10.00"));
+        assertThat(adapter.getBalance(A,USD).available()).isEqualByComparingTo("10");
+    }
+    @Test void existingWalletProviderClaimPreventsFiatPayoutCreation() {
+        var jdbc=mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(adapter,"jdbc",jdbc);
+        when(jdbc.queryForObject("select exists(select 1 from visa_wallet_payout where payment_id=?)",Boolean.class,"PAY-WALLET")).thenReturn(true);
+        var request=new VisaPaymentAdapter.PayoutRequest(UUID.randomUUID(),"PAY-WALLET","CORR-1",A,USD,
+                BigDecimal.ONE,UUID.randomUUID(),1,"0x"+"a".repeat(64),"SUCCEEDED");
+        assertThatThrownBy(()->adapter.createPayout(request)).hasMessage("SIMULATED_PAYOUT_DESTINATION_CONFLICT");
+        assertThat(reservations.findByPaymentId("PAY-WALLET")).isEmpty();
+    }
 }

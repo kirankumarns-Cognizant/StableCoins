@@ -1,5 +1,9 @@
 # Implementation Plan — Stablecoin Intelligent Payment Orchestration POC
 
+> Remaining and deferred work is tracked only in the [consolidated implementation backlog](40-IMPLEMENTATION-BACKLOG.md).
+> Dated checklists below retain historical context; update backlog IDs and closure evidence there.
+
+
 Architecture review completed: 2026-11-10
 Owner decisions recorded: 2026-11-10
 

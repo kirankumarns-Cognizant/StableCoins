@@ -23,8 +23,15 @@ public class BlockchainFlowConsumer {
   this.jdbc=jdbc;this.mapper=mapper;this.env=env;this.chain=chain;this.transactions=transactions;this.reads=reads;
 
  }
+ private com.cognizant.stablecoins.blockchain.besu.BesuPreparationObserver besuObserver;
+ @org.springframework.beans.factory.annotation.Autowired(required=false)
+ void besuObserver(com.cognizant.stablecoins.blockchain.besu.BesuPreparationObserver observer){this.besuObserver=observer;}
  @SqsListener("${app.sqs.flow-treasury-queue-name}")
  public void observe(String body){
+  if(isBesuObservation(body)){
+   if(besuObserver==null)throw new IllegalStateException("BESU_OBSERVATION_DISABLED");
+   besuObserver.observe(body);return;
+  }
   var event=FlowJson.read(mapper,body,"RoutingEvidenceRequested");var request=FlowJson.convert(mapper,event.payload(),Request.class);bind(event,request);reads.requireRequested(request);
   String fingerprint=FlowJson.fingerprint(mapper,request);
   var existing=jdbc.queryForList("select request_fingerprint from blockchain_flow_observation where request_id=?",String.class,request.requestId());
@@ -64,6 +71,11 @@ public class BlockchainFlowConsumer {
     catch(RuntimeException error){LoggerFactory.getLogger(getClass()).warn("service=blockchain-service event=receipt_poll_deferred paymentId={} correlationId={} txHash={}",tx.getPaymentId(),tx.getCorrelationId(),tx.getTxHash());}
    }
   }
+ }
+ private boolean isBesuObservation(String body){
+  if(body==null||body.length()>131072)return false;
+  try{return SettlementPreparation.EVENT.equals(mapper.readTree(body).path("eventType").asText());}
+  catch(Exception invalid){return false;}
  }
  private Execution command(String body,String type){var event=FlowJson.read(mapper,body,type);var execution=reads.execution(FlowJson.convert(mapper,event.payload(),Command.class).executionId());bind(event,execution.request());return execution;}
  private void enabled(){if(!env.getProperty("app.flow.execution-enabled",Boolean.class,false))throw new IllegalStateException("EXECUTION_DISABLED");}
