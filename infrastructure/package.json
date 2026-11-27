@@ -8,7 +8,8 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "backup:synth": "cdk synth StableCoinsRecovery --app \"npx ts-node --prefer-ts-exts bin/backup.ts\" --output cdk.backup.out"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

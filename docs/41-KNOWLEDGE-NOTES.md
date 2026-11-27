@@ -754,6 +754,17 @@ One application's state may live on several machines. A Windows folder backup ca
 A practical PoC solution uses a protected S3 destination, encrypted snapshots from each source environment, separate secret/password recovery, retained historical versions and a tested restoration into an isolated environment. Scheduling, retention and recovery-time targets are operating decisions; storage alone does not establish recoverability. Sources: [Restic S3 repository documentation](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html), [S3 Versioning](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html), [PostgreSQL consistent exports](https://www.postgresql.org/docs/16/app-pgdump.html), [Besu backup/restore](https://docs.besu-eth.org/private-networks/how-to/backup).
 
 
+### Does a successful AWS login mean backups are protected permanently?
+
+Follow-up learned: 27 November 2026. Authentication establishes which AWS identity is making requests; authorization determines which operations that identity can perform. A successful STS identity response does not prove permission to create or read a backup bucket. An assumed-role session uses temporary credentials: after expiry, a new authorized session is needed. An unattended backup therefore needs an approved credential-renewal mechanism and failure/age alerts; a one-time interactive login is insufficient.
+
+Long-term recovery also depends on continued access to the account and the independent encryption password. Organization-managed account access can change with role assignments or retention policy. Agree recovery ownership and access with the account administrator, and test that an authorized recovery operator can restore using independently secured credentials.
+
+Storage controls have different jobs: public-access blocking prevents public exposure; TLS protects transport; server-side encryption protects stored objects; client-side encryption protects contents before upload; versioning retains older object versions; infrastructure retention keeps resources when their deployment stack is removed. None alone proves that a complete, readable backup exists. For a deduplicating backup repository, indiscriminate age-based deletion can remove data still referenced by retained snapshots.
+
+Sources: [AWS temporary security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html), [STS identity API](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html), [CDK S3 bucket controls](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html), [Restic repository preparation](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html).
+
+
 ## K11: Why can a test work from one folder and fail from another?
 
 Date learned: 27 November 2026.

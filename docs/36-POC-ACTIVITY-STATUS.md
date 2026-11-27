@@ -6,6 +6,14 @@
 
 Recorded 2026-11-23. **Owner-observed MOCK USDC wallet walkthrough completed through RECONCILED. Overall POC acceptance remains in progress.**
 
+## 27 November 2026 - Independent backup storage foundation (D11)
+
+- Owner supplied successful AWS CLI version and STS identity output for the selected us-west-2 Region. This establishes an authenticated assumed-role session, not S3/CloudFormation permissions, permanent account ownership or a configured backup. Account/identity values are not copied into committed configuration.
+- Added a separate backup CDK entrypoint and stack, with explicit account/Region validation, a private owner-enforced/versioned/AES256 S3 bucket, TLS-only policy and retention of both bucket and policy on stack removal/replacement. No client IAM grants, object expiry, archive transitions, cleanup automation or application resources were added. The resource-only synthesizer does not require bootstrap infrastructure; CDK may also emit deployment metadata.
+- Added four meaningful storage/target assertions and a Windows copy/paste procedure for account-checked synthesis, CloudFormation deployment and read-only settings verification. The existing application CDK entrypoint, services, wallets, runtime modes and payment workflows were not changed.
+- TypeScript no-emit compilation passed. Synthesis passed using a dummy account and disabled lookups; no AWS deployment was attempted. Full infrastructure Jest rerun outside the sandbox passed: 3 suites, 19 tests, zero failures/skips (including all four new tests). The initial sandboxed run passed the new suite but two existing suites could not resolve the shared configuration module; the file exists and the outside-sandbox rerun passed. Existing ts-jest hybrid-module warnings remain informational. This is not database, Codespaces, chain or restore acceptance.
+- D11 remains IN PROGRESS: deploy/verify storage, establish scoped renewable access and independent encryption recovery, implement complete coordinated capture from both environments, and execute the isolated restore criteria in the central backlog. No bucket, upload, wallet read, application restart or transaction was performed. Extended the existing recovery knowledge topic with authentication/authorization, temporary sessions and distinct storage protections.
+
 ## 27 November 2026 - Frontend settlement test root and cleanup fix
 
 - Owner's Codespaces verification passed prerequisites but stalled in the Node stage until its approximately 20-minute timeout. The supplied log ended after test 35 with Vite unable to resolve React and /src/components/PrivatePaymentViews.tsx; no failing assertion was reported before the stall. This is not evidence that Java/database or live-chain acceptance ran.

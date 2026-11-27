@@ -1,9 +1,8 @@
 # StableCoins whole-solution backup and recovery
 
-Proposed operating design, 27 November 2026. Owner selected AWS S3 and us-west-2.
-Implementation and restore acceptance: **D11 OPEN** in [the central backlog](40-IMPLEMENTATION-BACKLOG.md).
-This document is a concrete recovery design, not evidence of a configured backup.
-No bucket, credentials, schedule, snapshot or restore has been created by this documentation change.
+Recovery design and isolated storage setup, 27 November 2026. Owner selected AWS S3 and us-west-2.
+Implementation and restore acceptance: **D11 IN PROGRESS** in [the central backlog](40-IMPLEMENTATION-BACKLOG.md).
+The separate CDK storage definition is available below. Storage deployment, backup capture and restore acceptance are distinct gates; no bucket, upload, schedule or restore is established by source changes.
 
 ## Storage and encryption
 
@@ -16,6 +15,65 @@ Use a dedicated private bucket named `stablecoins-recovery-<AWS-account-id>-us-w
 Store each backup encryption password in an independent approved password manager, with a separately secured offline recovery copy. Do not keep its only copy inside the S3 backup or Codespace. AWS access and the encryption password are both required to recover. Use short-lived AWS authentication where available; no root credentials or access keys in scripts/Git. Restrict clients to their own backup prefix and keep permanent-version deletion/retention administration separate from routine backup access. Restic requires coordination/lock permissions; validate least-privilege policies against actual operations rather than assuming write-only access is sufficient. Protect the AWS account with MFA and independent recovery arrangements.
 
 Versioning is an additional recovery layer, not protection against an unrestricted administrator permanently deleting all versions. Consider independently administered/cross-account replication or a separate offline encrypted copy when the required resilience is defined. Do not apply S3 age-based expiration or archival transitions to active Restic objects: retained snapshots share data objects. Object Lock needs a separately tested design compatible with Restic locking/pruning before enabling it.
+
+## Windows: provision only the independent storage foundation
+
+Prerequisites: AWS CLI authenticated to the intended account, Node/npm, this revision of the project and permission to create a CloudFormation stack, S3 bucket and bucket policy. The owner confirmed a successful STS identity check. The account uses an assumed role: authentication is temporary and is not proof of long-term account ownership or backup permissions. Retention, billing and recovery access must be agreed with the account administrator. No account ID, identity email, credential or profile value is committed here.
+
+The isolated [CDK entrypoint](../infrastructure/bin/backup.ts) creates one S3 bucket and its TLS-only policy (CDK may also emit deployment metadata). It does not invoke the application stack, change IAM grants, start containers or read wallets. Its resource-only synthesizer needs no CDK bootstrap resources. The bucket and policy are retained on stack deletion/replacement; do not delete/recreate the stack to resolve deployment errors. There is deliberately no expiration, archival transition, auto-cleanup or Object Lock policy. Storage/version history incurs ordinary S3 charges when data is stored.
+
+Run in **Windows PowerShell**, using the local project containing these files:
+
+```powershell
+Set-Location 'C:\Users\884412\OneDrive - Cognizant\Public\Presentations\BFSI\StableCoins\StableCoinsDemo\infrastructure'
+
+$backupAccount = aws sts get-caller-identity --region us-west-2 --query Account --output text --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'AWS login failed; refresh the existing role session.' }
+$env:BACKUP_ACCOUNT_ID = $backupAccount.Trim()
+$env:BACKUP_REGION = 'us-west-2'
+if ($env:BACKUP_ACCOUNT_ID -notmatch '^[0-9]{12}$') { throw 'Invalid STS account.' }
+
+npm.cmd ci
+if ($LASTEXITCODE -ne 0) { throw 'Infrastructure dependency installation failed.' }
+npm.cmd run backup:synth
+if ($LASTEXITCODE -ne 0) { throw 'Backup template synthesis failed.' }
+
+# Review the target and generated resource definitions before deployment.
+Write-Host "Backup target: $env:BACKUP_ACCOUNT_ID / $env:BACKUP_REGION"
+Get-Content .\cdk.backup.out\StableCoinsRecovery.template.json
+```
+
+This synthesis block creates a local account-specific template only. It does not create AWS resources. The output directory is ignored. Existing application CDK configuration remains unchanged. Confirm the displayed target is the intended account, then deploy **that template** (no bootstrap or IAM capability flag):
+
+```powershell
+$currentAccount = aws sts get-caller-identity --region us-west-2 --query Account --output text --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'AWS session unavailable.' }
+if ($currentAccount.Trim() -ne $env:BACKUP_ACCOUNT_ID) { throw 'AWS account changed; stop and regenerate the reviewed template.' }
+
+aws cloudformation deploy --region us-west-2 --stack-name StableCoinsRecovery --template-file .\cdk.backup.out\StableCoinsRecovery.template.json --no-fail-on-empty-changeset
+if ($LASTEXITCODE -ne 0) { throw 'Backup storage deployment failed; preserve existing resources and inspect the stack events.' }
+
+aws cloudformation describe-stacks --region us-west-2 --stack-name StableCoinsRecovery --query 'Stacks[0].Outputs' --output table --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify stack outputs.' }
+
+$backupBucket = "stablecoins-recovery-${env:BACKUP_ACCOUNT_ID}-us-west-2"
+aws s3api get-bucket-versioning --region us-west-2 --bucket $backupBucket --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify versioning.' }
+aws s3api get-public-access-block --region us-west-2 --bucket $backupBucket --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify public access protection.' }
+aws s3api get-bucket-encryption --region us-west-2 --bucket $backupBucket --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify encryption.' }
+aws s3api get-bucket-ownership-controls --region us-west-2 --bucket $backupBucket --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify ownership controls.' }
+aws s3api get-bucket-policy --region us-west-2 --bucket $backupBucket --query Policy --output text --no-cli-pager
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify TLS policy.' }
+```
+
+Expected: CloudFormation CREATE_COMPLETE or UPDATE_COMPLETE; versioning Enabled; all four public-access flags true; AES256 default encryption; BucketOwnerEnforced ownership; a Deny policy for aws:SecureTransport=false on the bucket and its objects. A successful STS call does not establish these permissions. If access is denied or the bucket name exists, retain the error and inspect ownership/permissions; do not grant broad access or delete an existing bucket as a workaround.
+
+**Storage alone is not a working backup.** Do not manually upload wallet/password folders. D11 next requires scoped backup-client access, independently recoverable encryption, complete inventory and coordinated capture for each source, followed by verification and an isolated restore rehearsal. The two repository outputs identify separate future Restic repositories; synthesis/deployment does not initialize them. Session variables contain no secrets and must be re-established in a new terminal; unattended role renewal and protected secret retrieval remain part of D11.
+
+Local validation on 27 November 2026: TypeScript no-emit compilation and synthesis passed; all 19 infrastructure tests passed outside the Windows sandbox, including four storage/target assertions. AWS settings and restore acceptance must be observed separately.
 
 ## Capture inventory
 
