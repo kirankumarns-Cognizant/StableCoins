@@ -44,7 +44,10 @@ class PaymentFlowPersistenceIT {
  @BeforeEach void setup(){
   for(String service:List.of("compliance-quote-service","blockchain-service","settlement-ledger-service"))Flyway.configure().dataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword()).locations("filesystem:"+migrations(service).toString().replace('\\','/')).table("it_history_"+service.replace('-','_')).baselineOnMigrate(true).baselineVersion("0").load().migrate();
   new TransactionTemplate(transactions).executeWithoutResult(status->{
-   jdbc.execute("truncate table blockchain_transaction,blockchain_wallet,compliance_flow_quote,compliance_execution_validation,blockchain_flow_observation,ledger_journal cascade");jdbc.execute("truncate table customer cascade");jdbc.execute("truncate table payment_outbox_event");
+   jdbc.execute("truncate table blockchain_transaction,blockchain_wallet,compliance_flow_quote,compliance_execution_validation,blockchain_flow_observation,ledger_journal cascade");
+   jdbc.execute("truncate table customer cascade");
+   // Dedicated Testcontainers database only: Besu funding references the outbox even when empty.
+   jdbc.execute("truncate table payment_outbox_event cascade");
    var c=new Customer();c.setName("Fictional flow customer");c.setCustomerType("CORPORATE");em.persist(c);em.flush();
    var a=IntentFixtures.account();a.setCustomerId(c.getCustomerId());a.setAccountType("OPERATING");a.setBalance(new BigDecimal("20000"));em.persist(a);
    var b=IntentFixtures.beneficiary();b.setCustomerId(c.getCustomerId());b.setName("Fictional supplier");b.setCountry("USA");b.setCurrency("USD");em.persist(b);em.flush();accountId=a.getAccountId();

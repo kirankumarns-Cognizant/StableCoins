@@ -765,6 +765,28 @@ Storage controls have different jobs: public-access blocking prevents public exp
 Sources: [AWS temporary security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html), [STS identity API](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html), [CDK S3 bucket controls](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html), [Restic repository preparation](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html).
 
 
+## K12: Why can Java tests report a missing class when its source exists?
+
+Date learned: 27 November 2026.
+
+Java source files are inputs to compilation. Maven normally writes application bytecode to target/classes and test bytecode to target/test-classes; it also copies application configuration resources into the build output. The test runner uses a runtime classpath to locate these outputs and dependencies. A source file existing in Git does not prove its compiled class is available to that runner.
+
+NoClassDefFoundError can have several causes, including a missing runtime class or a previous failure to initialize a class. Inspect its cause rather than treating every instance as missing source. A ClassNotFoundException cause specifically indicates that the relevant classloader could not locate the requested class. Files found after a test failure establish their presence at inspection time, not necessarily their earlier presence or inclusion on the failing classloader's path.
+
+A clean rebuild regenerates Maven build outputs and is useful for investigating inconsistent generated files. It does not by itself prove why the earlier run failed. Under this project's current Maven configuration, clean removes generated build directories; it is separate from database migration, deleting Docker volumes or reinitializing wallets and blockchain state. Passing focused tests establishes only their scope, not complete payment or chain acceptance.
+
+Sources: [Maven standard directory layout](https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout.html), [Surefire test classpath](https://maven.apache.org/surefire/maven-surefire-plugin/examples/configuring-classpath.html), [Maven Clean directories](https://maven.apache.org/plugins/maven-clean-plugin/clean-mojo.html), and [project Maven configuration](../services/pom.xml).
+
+### Why can test database cleanup fail after adding a foreign key?
+
+Follow-up learned: 27 November 2026.
+
+A foreign key preserves a relationship between records. For example, a funding record can reference the exact outbox event that authorized it. PostgreSQL normally refuses to truncate a referenced table unless the same statement includes its referencing tables; emptying those tables in an earlier statement does not remove the relationship. In a disposable test database, deliberate cascading cleanup can reset that related fixture together. It is destructive test preparation, not a recovery operation for application financial records. Production corrections still require authorized compensating entries and preserved audit evidence.
+
+Also distinguish the initiating SQL error from a later cleanup error. If an SQL operation fails and its connection is then closed, rollback can fail too. The final exception may therefore describe rollback rather than the first fault; inspect preceding structured logs and nested causes before changing connection settings. A failure in a test's setup method means its business assertions have not yet been exercised.
+
+Project example: a Besu funding record links to its durable outbox event. That relationship requires the older public-flow test fixture to reset related test data consistently; it does not require weakening the production foreign key. Sources: [PostgreSQL TRUNCATE semantics](https://www.postgresql.org/docs/16/sql-truncate.html), [funding schema](../services/payment-service/src/main/resources/db/migration/V18__besu_simulated_funding.sql), [isolated persistence fixture](../services/payment-service/src/test/java/com/cognizant/stablecoins/payment/flow/PaymentFlowPersistenceIT.java).
+
 ## K11: Why can a test work from one folder and fail from another?
 
 Date learned: 27 November 2026.
