@@ -787,6 +787,58 @@ Also distinguish the initiating SQL error from a later cleanup error. If an SQL 
 
 Project example: a Besu funding record links to its durable outbox event. That relationship requires the older public-flow test fixture to reset related test data consistently; it does not require weakening the production foreign key. Sources: [PostgreSQL TRUNCATE semantics](https://www.postgresql.org/docs/16/sql-truncate.html), [funding schema](../services/payment-service/src/main/resources/db/migration/V18__besu_simulated_funding.sql), [isolated persistence fixture](../services/payment-service/src/test/java/com/cognizant/stablecoins/payment/flow/PaymentFlowPersistenceIT.java).
 
+### Why can a database safety check work while its test reports failure?
+
+Follow-up learned: 27 November 2026.
+
+Some database constraints are deferred until commit so related records can be written within one transaction. For example, a final receipt, matching terminal submission status and audit record must exist together when the transaction commits. Inserting just the receipt can succeed initially, while committing that incomplete transaction must fail. Spring may wrap the PostgreSQL reason in a general transaction exception. A negative test should verify the database cause and resulting rollback, rather than assume the outer exception repeats the database message. Retain the constraint while correcting an assertion that inspects the wrong exception layer.
+
+Synthetic fixtures must also satisfy unrelated input rules so a test reaches the behavior it intends to exercise. An EVM address has 40 hexadecimal digits after 0x; repeating a two-digit seed 40 times creates 80 digits. A fixture-length correction does not justify relaxing production address validation. Sources: [deferred receipt constraints](../services/blockchain-service/src/main/resources/db/migration/V11__besu_final_receipt.sql), [liquidity persistence tests](../services/blockchain-service/src/test/java/com/cognizant/stablecoins/blockchain/besu/BesuLiquidityPersistenceIT.java), [address validator](../services/platform-flow/src/main/java/com/cognizant/stablecoins/flow/SettlementNetwork.java).
+
+## K13: How should we evaluate the business case for stablecoin payment orchestration?
+
+Date learned: 27 November 2026.
+
+A payment orchestration product translates a customer's required outcome into an eligible, approved and traceable payment path. Its business case depends on the customer's full journey: funding, currency conversion, liquidity, compliance, settlement, beneficiary access to funds, exception handling and reconciliation. Blockchain gas is only one cost component. Fast token confirmation does not by itself establish fast delivery of spendable fiat to a beneficiary.
+
+For product discovery, ask which buyer and payment corridor have a measurable problem, which alternatives they use, and what evidence would justify changing providers. Compare total delivered cost, time to usable funds, prefunding, availability, controls and recoverability. Treat demand and economic advantage as hypotheses to validate with customers and independent industry research.
+
+Separate the product's orchestration responsibilities from those of issuers, custodians, banks, payment schemes and liquidity/on-off-ramp providers. A wallet transfer, a card payout and a bank-account credit can require different partners and controls. An analyst inquiry should clarify adoption opportunities, defensible differentiation, decision criteria and partnership dependencies. It supplies market input; it does not establish regulatory authorization or partner API access.
+
+Project example: Base Sepolia and private Besu demonstrate different technical settlement environments. They are not evidence of commercial demand, production fiat backing or production rail availability. Shared approvals, accounting and reconciliation illustrate product capabilities whose commercial value still needs validation.
+
+Sources: owner product-vision and analyst-inquiry discussion, 27 November 2026 (questions and product-discovery reasoning, not Gartner findings); [system objective and simulation boundaries](../AGENTS.md), [accepted network scope](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md). No Gartner or Visa engagement or endorsement is asserted.
+
+### How can crypto be stolen if blockchain records are secure?
+
+Follow-up learned: 27 November 2026.
+
+Blockchain consensus checks transactions against protocol rules, including signatures. It does not establish that a human understood or intended the signed action. An attacker can target signing keys, wallet interfaces, application credentials, software dependencies or contract privileges. A transaction induced by deception can be valid on-chain, confirmed and accurately recorded in an accounting system. Reconciliation detects mismatched evidence; matching records alone do not establish legitimate authorization.
+
+A dated example is the February 2025 Bybit theft, which the FBI described as approximately USD 1.5 billion. Ledger's published analysis describes a supply-chain attack affecting the Safe wallet signing interface. This example is not presented as the latest incident or as evidence that Ethereum consensus was defeated.
+
+For payment orchestration, evaluate independent verification of the exact chain, token contract, recipient, amount and permitted contract action before signing; custody/key isolation; privileged-operation separation; recipient and value policies; software delivery controls; monitoring and incident response. Multiple approvals are useful only when approvers have trustworthy transaction details and suitable independence. Encrypted keystore files protect stored keys but do not prevent misuse by a compromised process that can unlock them. A private Besu network still needs application, signer and validator protection. Pausing future activity does not automatically undo a finalized transfer.
+
+Project example: immutable approved instructions, pinned network identity and receipt matching are relevant design foundations. Their presence does not certify production security. Production custody and security validation remain distinct from functional demonstration acceptance; this learning entry does not activate new scope or assert new controls have been implemented.
+
+Sources: [FBI Bybit notice](https://www.fbi.gov/investigate/cyber/alerts/2025/north-korea-responsible-for-1-5-billion-bybit-hack), [Ledger incident analysis](https://www.ledger.com/blog-learning-from-the-bybit-safe-attack), [project security rules](../AGENTS.md), [network separation decision](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md). Control implications are engineering reasoning applied to the product vision.
+
+### What does the October 2026 Binance incident teach about signing authority?
+
+Follow-up learned: 27 November 2026.
+
+The owner supplied the October 29, 2026 Binance incident as a more recent example. Binance's preliminary report describes approximately USD 6.34 billion impacted and unauthorized access to an internal wallet signing service, including use of EIP-7702 delegation on Ethereum. A November 23 US government forfeiture complaint also alleges approximately USD 6 billion stolen. These sources describe compromised authorization infrastructure; they do not establish that Ethereum or Bitcoin consensus was defeated. Investigation findings should remain attributed to their sources.
+
+EIP-7702 is an Ethereum account code-delegation mechanism, not itself a multisignature protocol. It permits a signed authorization to assign execution code to an externally owned account. A compromised signing service can therefore be dangerous even without exporting a private key. Binance reports that stopping its withdrawals did not invalidate already established on-chain delegations; separate on-chain revocation was needed. The specification likewise treats delegation changes as security-critical.
+
+Replenishing customer backing is different from recovering stolen assets. Binance reported 98% replenishment as of November 3 and separately reported approximately USD 2.85 billion frozen or intercepted. Frozen, recovered and replenished amounts should not be treated as interchangeable.
+
+The owner also supplied [The Crypto Times explainer](https://www.cryptotimes.io/insights/binance-hack-explained/). Its discussion of repeated incoming funds illustrates a further general risk: treasury automation can increase losses if it continues funding a compromised wallet. Engineering implications include bounded hot-wallet exposure, separate reserve authority, and coordinated suspension of automated replenishment and signing when compromise is suspected. These are security design considerations, not claims about controls implemented in this POC. For incident mechanics, prefer the attributed preliminary Binance report and EIP specification above; a secondary report's inference that multiple genuine signatures prove a particular key-compromise mechanism is not conclusive by itself.
+
+For this product vision, the engineering implication is to evaluate controls at the signing boundary, including permitted transaction types, exact targets and calldata, amount/recipient policies and delegation restrictions, plus an incident procedure for existing on-chain permissions. Application approval screens and encrypted keystores alone do not prove that a compromised signer cannot bypass normal workflows. A private Besu deployment also requires signer and administrative protection. This is conceptual security guidance, not a code audit or a claim that these controls were added or tested.
+
+Sources: [Binance preliminary incident report](https://www.binance.com/en/square/post/384328127385979), [US forfeiture complaint filed November 23, 2026](https://www.justice.gov/usao-dc/media/1473936/dl?inline=), [EIP-7702 specification and security considerations](https://eips.ethereum.org/EIPS/eip-7702). Product implications are engineering inference.
+
 ## K11: Why can a test work from one folder and fail from another?
 
 Date learned: 27 November 2026.

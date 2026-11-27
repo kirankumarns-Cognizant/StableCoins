@@ -348,6 +348,8 @@ class BesuLiquidityPersistenceIT {
         assertThatThrownBy(()->tx.executeWithoutResult(s->jdbc.update(
                 "insert into besu_final_receipt(execution_id,scope_key,tx_hash,block_hash,block_number,success,gas_used,gas_price,total_fee_wei) values (?,?,?,?,101,true,21000,1000,21000000)",
                 t.execution.executionId(),t.execution.context().nonceScope(),t.hash,BesuBlockchainAdapterTest.BLOCK)))
+                .isInstanceOf(org.springframework.transaction.TransactionSystemException.class)
+                .rootCause().isInstanceOf(java.sql.SQLException.class)
                 .hasMessageContaining("BESU_RECEIPT_RESOLUTION_NOT_ATOMIC");
         assertThat(new BesuSubmissionStore(jdbc).receipt(t)).isEmpty();
         assertThatThrownBy(()->jdbc.update("update besu_signed_submission set status='CONFIRMED' where execution_id=?",t.execution.executionId()))
@@ -403,7 +405,7 @@ class BesuLiquidityPersistenceIT {
         assertThat(reads.funded(null)).noneMatch(row->row.id().equals(e.executionId()));
     }
     @Test void claimDiscoveryMovesFromUnreservedToPinnedToFundedWithoutCreatingAuthority() {
-        var e=seed(context(CHAIN,"b","71"),"PAY-CLAIM-WORK-STAGES","1","0.1");
+        var e=seed(context(CHAIN,"b","c"),"PAY-CLAIM-WORK-STAGES","1","0.1");
         var reads=new SettlementClaimWorkReads(jdbc);
         jdbc.update("insert into payment values (?, 'COMPLIANCE_APPROVED')",e.instruction().paymentId());
         assertThat(claimRows(reads,false)).contains(e.executionId());
@@ -418,7 +420,7 @@ class BesuLiquidityPersistenceIT {
         assertThat(claimRows(reads,false)).doesNotContain(e.executionId());
     }
     @Test void rolledBackReservationDoesNotBecomeFundingWorkAndChangedPaymentStopsDiscovery() {
-        var e=seed(context(CHAIN,"b","72"),"PAY-CLAIM-WORK-ROLLBACK","1","0.1");
+        var e=seed(context(CHAIN,"b","f"),"PAY-CLAIM-WORK-ROLLBACK","1","0.1");
         var reads=new SettlementClaimWorkReads(jdbc);
         jdbc.update("insert into payment values (?, 'COMPLIANCE_APPROVED')",e.instruction().paymentId());
         assertThatThrownBy(()->tx.executeWithoutResult(s->{
