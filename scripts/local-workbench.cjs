@@ -62,16 +62,17 @@ function parseSuites(xml) {
   if(!first) throw Error('Invalid test report');
   const attr = Object.fromEntries([...first[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(match=>[match[1],match[2]]));
   const result = Object.fromEntries(['tests','failures','errors','skipped'].map(key => [key,Number(attr[key] ?? 0)]));
-  if(Object.values(result).some(value => !Number.isSafeInteger(value) || value < 0)) throw Error('Invalid test counts');
+  if(!attr.name || Object.values(result).some(value => !Number.isSafeInteger(value) || value < 0) ||
+    result.failures+result.errors+result.skipped>result.tests) throw Error('Invalid test counts');
   return {...result,name:attr.name,passed:result.tests-result.failures-result.errors-result.skipped};
 }
-function freshJavaResults(since) {
+function freshJavaResults(since, reportRoot=root) {
   const suites=[];
   for(const module of modules) for(const folder of ['surefire-reports','failsafe-reports']) {
-    const directory=join(root,'services',module,'target',folder);
+    const directory=join(reportRoot,'services',module,'target',folder);
     if(!existsSync(directory)) continue;
     for(const file of readdirSync(directory)) if(/^TEST-.+\.xml$/.test(file) && statSync(join(directory,file)).mtimeMs >= since) {
-      suites.push({module,...parseSuites(readFileSync(join(directory,file),'utf8'))});
+      suites.push({module,reportKind:folder==='failsafe-reports'?'integration':'unit',...parseSuites(readFileSync(join(directory,file),'utf8'))});
     }
   }
   const totals={tests:0,passed:0,failures:0,errors:0,skipped:0};
@@ -88,12 +89,37 @@ const requiredDatabaseSuites = [
   'com.cognizant.stablecoins.ledger.integration.LedgerServiceIT',
   'com.cognizant.stablecoins.reconciliation.flow.ReconciliationPersistenceIT',
   'com.cognizant.stablecoins.visa.liquidity.ProviderLiquidityPersistenceIT',
+  'com.cognizant.stablecoins.visa.liquidity.WalletPayoutPersistenceIT',
+  'com.cognizant.stablecoins.payment.settlement.SettlementBindingPersistenceIT',
+  'com.cognizant.stablecoins.payment.settlement.SettlementPreparationPersistenceIT',
+  'com.cognizant.stablecoins.payment.settlement.SettlementExecutionClaimPersistenceIT',
+  'com.cognizant.stablecoins.payment.settlement.SettlementFundingPersistenceIT',
+  'com.cognizant.stablecoins.payment.approval.SettlementApprovalClaimPersistenceIT',
+  'com.cognizant.stablecoins.blockchain.besu.BesuLiquidityPersistenceIT',
+  'com.cognizant.stablecoins.ledger.integration.BesuAccountingPersistenceIT',
+  'com.cognizant.stablecoins.ledger.besu.BesuAccountingWorkReadsIT',
+  'com.cognizant.stablecoins.reconciliation.besu.BesuReconciliationPersistenceIT',
 ];
-function databaseGate(suites) {
-  return modules.every(module=>suites.some(suite=>suite.module===module)) &&
-    requiredDatabaseSuites.every(name=>suites.some(suite=>suite.name===name && suite.tests>0 && suite.passed===suite.tests && !suite.failures && !suite.errors && !suite.skipped)) &&
-    suites.every(suite=>!suite.skipped || suite.name==='com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest');
+function databaseEvidence(suites) {
+  const moduleFor=name=>name.includes('.ledger.')?'settlement-ledger-service':name.includes('.reconciliation.')?'reconciliation-service':name.includes('.visa.')?'visa-simulator':name.includes('.blockchain.')?'blockchain-service':'payment-service';
+  const missingModules=modules.filter(module=>!suites.some(suite=>suite.module===module && suite.tests>0));
+  const required=requiredDatabaseSuites.map(name=>{
+    const found=suites.filter(suite=>suite.name===name);
+    const reasons=[];
+    if(!found.length)reasons.push('MISSING_FRESH_REPORT');
+    else if(found.length!==1)reasons.push('DUPLICATE_REPORTS');
+    for(const suite of found) {
+      if(suite.module!==moduleFor(name) || suite.reportKind!=='integration')reasons.push('WRONG_REPORT_ORIGIN');
+      if(!(suite.tests>0) || suite.passed!==suite.tests || suite.failures || suite.errors || suite.skipped)reasons.push('NOT_FULLY_EXECUTED_AND_PASSED');
+    }
+    return {name,status:reasons.length?'NOT_SATISFIED':'PASSED',reasons:[...new Set(reasons)]};
+  });
+  const unexpectedSkips=suites.filter(suite=>suite.skipped && suite.name!=='com.cognizant.stablecoins.payment.agent.RoutingAgentLiveTest').map(suite=>suite.name);
+  const failedSuites=suites.filter(suite=>suite.failures || suite.errors).map(suite=>suite.name);
+  return {status:!missingModules.length && required.every(suite=>suite.status==='PASSED') && !unexpectedSkips.length && !failedSuites.length?'PASSED':'NOT_SATISFIED',
+    missingModules,required,unexpectedSkips,failedSuites};
 }
+function databaseGate(suites) {return databaseEvidence(suites).status==='PASSED';}
 function localUrl(value) {
   const url=new URL(value);
   if(url.protocol !== 'http:' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error('Local smoke checks require HTTP loopback service origins');
@@ -244,8 +270,12 @@ async function main(args=process.argv.slice(2),dependencies={}) {
       const skips=report.java.suites.filter(suite=>suite.skipped>0);
       // Default offline model evaluation may skip; database cases must execute in the strict gate.
       report.skippedSuites=skips.map(({name,skipped})=>({name,skipped}));
-      report.databaseGate=databaseGate(report.java.suites)?'PASSED':'NOT_SATISFIED';
-      if(args.includes('--require-database') && report.databaseGate!=='PASSED')throw Error('Required database/integration tests skipped or module reports missing');
+      report.databaseEvidence=databaseEvidence(report.java.suites);
+      report.databaseGate=report.databaseEvidence.status;
+      if(args.includes('--require-database') && report.databaseGate!=='PASSED') {
+        for(const suite of report.databaseEvidence.required.filter(suite=>suite.status!=='PASSED'))console.error(`Database evidence: ${suite.name} | ${suite.reasons.join(', ')}`);
+        throw Error('Required database/integration evidence incomplete; inspect databaseEvidence in report.json');
+      }
       verification.update('java-evidence','PASSED');
       report.status=report.java.totals.skipped?'PASSED_WITH_SKIPS':'PASSED';
     }
@@ -319,5 +349,5 @@ async function main(args=process.argv.slice(2),dependencies={}) {
   for(const message of startupMessages(report))console.log(message);
   return report;
 }
-module.exports={run,requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,verificationEnvironment,startupMessages,validationArguments,main};
+module.exports={run,requiredDatabaseSuites,command,parseSuites,localUrl,probe,doctor,smoke,freshJavaResults,databaseGate,databaseEvidence,verificationEnvironment,startupMessages,validationArguments,main};
 if(require.main===module)main().catch(()=>{console.error('Local validation could not start');process.exitCode=2;});

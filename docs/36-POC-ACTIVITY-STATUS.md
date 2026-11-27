@@ -6,6 +6,14 @@
 
 Recorded 2026-11-23. **Owner-observed MOCK USDC wallet walkthrough completed through RECONCILED. Overall POC acceptance remains in progress.**
 
+## 27 November 2026 - Besu database acceptance evidence gate
+
+- Continued the owner-approved sequence: Besu payment acceptance and separate Base Sepolia regression before issuer-lifecycle expansion. No shared business refactor or issuer contract change.
+- Found ordinary blockchain Maven verify selected only TreasuryReservationPersistenceIT, omitting BesuLiquidityPersistenceIT. Added the private PostgreSQL suite to the ordinary build; live private readiness and public testnet profiles remain separate.
+- Expanded strict workbench verification to 19 required database suites, including nine Besu suites and Visa wallet persistence. Fresh reports retain integration/unit provenance; the gate rejects missing, skipped, empty, failed, duplicate or wrong-origin required evidence. Structured per-suite reasons are saved under databaseEvidence in report.json. A source-inventory regression check guards against silently omitting new IT suites; two explicit live-chain suites and the existing excluded/disabled legacy BlockchainServiceIT fixture are classified separately (legacy review remains D09).
+- Executed verification-tooling regressions: **46 tests passed, zero failures, zero skips** across local-workbench, database-evidence, startup-status and failure-diagnostics suites. Real PostgreSQL, Besu chain, authenticated UI and Base Sepolia regression were not executed on this host; Docker/psql remain unavailable. B01-B10 and D01 remain open against their existing closure criteria.
+- Updated the Codespaces handoff, staged application guide and personal knowledge notes. Customer private creation remains hard-gated; no credentials changed, chain started, transaction submitted or runtime worker enabled. The owner will execute Codespaces gates from the published source. Maven validate for blockchain-service and shared dependencies passed at 19:51:47 Asia/Calcutta. The first offline attempt failed because Failsafe 3.2.5 was not cached; the approved online retry succeeded. This is configuration validation, not Java integration-test execution. GitHub publication is verified separately in the ignored handover.
+
 ## 27 November 2026 - Scope comparison and GitHub publication preparation
 
 - Reviewed both network paths and the supplied issuer intent. Added [the dated comparison and Codespaces handoff](42-NETWORK-COMPARISON-AND-ISSUER-SCOPE.md): eight path differences; sixteen functional groups (nine new core issuer, six extensions, one deferred institutional integration); three separately counted assurance/delivery groups. Counts are a stated grouping, not an industry certification or a task-completion percentage.

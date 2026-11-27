@@ -89,7 +89,7 @@
 
     <build>
         <plugins>
-            <!-- Run the existing treasury PostgreSQL suite during ordinary verify.
+            <!-- Run both public treasury and private Besu PostgreSQL suites during verify.
                  Public-chain execution remains restricted to the explicit testnet profile. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -97,6 +97,7 @@
                 <configuration>
                     <includes>
                         <include>**/TreasuryReservationPersistenceIT.java</include>
+                        <include>**/BesuLiquidityPersistenceIT.java</include>
                     </includes>
                 </configuration>
                 <executions>

@@ -68,11 +68,11 @@ test('validate all service origins before contacting any of them',async()=>{
   assert.equal(calls,0);
 });
 test('strict database gate requires every module and permits only the named optional live model skip',()=>{
-  const suites=['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'].map(module=>({module,name:'ExecutedTest',skipped:0}));
+  const suites=['platform-flow','platform-security','payment-service','compliance-quote-service','blockchain-service','settlement-ledger-service','reconciliation-service','visa-simulator'].map(module=>({module,name:'ExecutedTest',tests:1,passed:1,skipped:0}));
   assert.equal(databaseGate(suites),false); // Unit suites alone cannot satisfy database acceptance.
   for(const name of require('./local-workbench.cjs').requiredDatabaseSuites) {
     const module=name.includes('.blockchain.')?'blockchain-service':name.includes('.ledger.')?'settlement-ledger-service':name.includes('.reconciliation.')?'reconciliation-service':name.includes('.visa.')?'visa-simulator':'payment-service';
-    suites.push({module,name,tests:1,passed:1,failures:0,errors:0,skipped:0});
+    suites.push({module,name,reportKind:'integration',tests:1,passed:1,failures:0,errors:0,skipped:0});
   }
   assert.equal(databaseGate(suites),true);
   assert.equal(databaseGate(suites.slice(0,-1)),false);

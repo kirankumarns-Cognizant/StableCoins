@@ -34,6 +34,16 @@ node infrastructure/besu/cli.cjs preflight 1
 `preflight` must identify the already deployed private chain/token and sufficient balances.
 A failing check is a reason to inspect preserved setup state, not to initialize again.
 
+## Database evidence before private activation
+
+Run the strict database verification in [the Codespaces validation order](../../docs/42-NETWORK-COMPARISON-AND-ISSUER-SCOPE.md#github---codespaces-validation-order)
+after installing its prerequisites. The gate requires fresh integration reports for all nine
+Besu persistence suites alongside the existing application/public suites and Visa wallet
+persistence. The report identifies missing or incomplete suites; a unit-only success is
+insufficient. Ordinary Maven verify includes the private liquidity persistence suite.
+These are disposable PostgreSQL tests, separate from live private/public chain acceptance.
+The private instruction lock remains in place after a database pass.
+
 ## Prepare a persistent variable file
 
 Choose the public mode explicitly. For the existing Base Sepolia application, use `testnet`:

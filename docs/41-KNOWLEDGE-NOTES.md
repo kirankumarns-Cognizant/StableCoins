@@ -106,6 +106,34 @@ Sources: [AWS explanation of Ethereum/EVM](https://docs.aws.amazon.com/managed-b
 [Besu private networks](https://docs.besu-eth.org/private-networks),
 [ADR-016](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md).
 
+### What should be shared between settlement networks, and what belongs in an adapter?
+
+Captured: 27 November 2026.
+
+A payment has business rules that remain useful across networks: customer scope,
+the approved amount and recipient, independent approvals, duplicate prevention,
+balanced accounting and reconciliation. These are candidates for shared domain
+components. A shared rule does not require identical database records or one
+large implementation for every network.
+
+Network adapters handle differences such as RPC calls, chain and token identity,
+fee calculation, signing formats and receipt/finality interpretation. The shared
+workflow must retain the selected network and asset throughout execution; it
+cannot switch networks after signing or submission to recover from uncertainty.
+Tokens with the same decimals or symbol on different networks are still separate
+assets with separate balances and accounting evidence.
+
+More detailed settlement safeguards do not imply a more complete stablecoin
+issuer product. Issuance, fiat backing and redemption are additional business
+capabilities; operating a private blockchain does not supply them automatically.
+In this POC, prefunded token payment settlement and fixed constructor supply are
+different from deposit-driven minting and redemption-driven burning.
+
+Sources: [accepted network architecture](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md),
+[settlement binding model](../services/platform-flow/src/main/java/com/cognizant/stablecoins/flow/SettlementBinding.java),
+[blockchain adapter contract](../services/blockchain-service/src/main/java/com/cognizant/stablecoins/blockchain/service/BlockchainAdapter.java),
+[private demonstration token](../infrastructure/besu/contracts/BesuDemoUSD.sol).
+
 ## K03: Can EVM run on AWS?
 
 Captured and AWS service notice checked: 26 November 2026.
@@ -275,6 +303,26 @@ database has already been upgraded or that every production upgrade case passed.
 Sources: [execution-claim migration](../services/payment-service/src/main/resources/db/migration/V16__settlement_execution_claim.sql),
 [claim persistence tests](../services/payment-service/src/test/java/com/cognizant/stablecoins/payment/settlement/SettlementExecutionClaimPersistenceIT.java),
 [local test strategy](../adr/ADR-010-LOCAL-DEVELOPMENT.md).
+### Why must missing or skipped integration tests block acceptance?
+
+Captured: 27 November 2026.
+
+A unit test can verify a rule using substitutes for storage. A PostgreSQL integration
+test checks whether real database behavior also preserves that rule: locks prevent
+competing payments from overspending, constraints reject invalid records and a failed
+transaction rolls back its related writes together. These are different kinds of evidence.
+
+A passing test command does not prove every intended test ran. Build configuration can
+exclude a suite, Docker-dependent tests can be skipped, and an old successful report can
+remain on disk. Acceptance therefore checks fresh reports from the correct test phase
+and service, requires actual execution without failures/skips and checks that required
+suites are present. Database acceptance still does not establish network consensus,
+wallet signing, real token delivery or an authenticated end-to-end customer journey.
+
+Sources: [verification tooling](../scripts/local-workbench.cjs),
+[database evidence regression tests](../scripts/database-evidence.test.cjs),
+[network acceptance boundaries](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md).
+
 ## Maintaining these notes
 
 For future learning questions, retain the question as a heading and explain the
