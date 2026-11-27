@@ -6,6 +6,14 @@
 
 Recorded 2026-11-23. **Owner-observed MOCK USDC wallet walkthrough completed through RECONCILED. Overall POC acceptance remains in progress.**
 
+## 27 November 2026 - Frontend settlement test root and cleanup fix
+
+- Owner's Codespaces verification passed prerequisites but stalled in the Node stage until its approximately 20-minute timeout. The supplied log ended after test 35 with Vite unable to resolve React and /src/components/PrivatePaymentViews.tsx; no failing assertion was reported before the stall. This is not evidence that Java/database or live-chain acceptance ran.
+- Corrected frontend/tests/settlement.test.mjs to resolve the frontend root relative to import.meta.url rather than process.cwd(). Moved Vite creation/module loading into a before hook and retained optional cleanup in after, so module setup failures remain inside the test lifecycle. No production frontend, backend, wallet, runtime mode or payment behavior changed.
+- Executed 39 frontend tests from the repository root: all passed, zero skipped. The six settlement tests also passed when launched from the frontend directory. The complete workbench-equivalent Node stage passed outside the Windows sandbox: 191 passed, zero failed, zero skipped, about 17 seconds. An initial sandboxed full run hit the explicit 180-second diagnostic bound; Windows process inspection was denied there. The outside-sandbox rerun resolves that local validation limitation, not Codespaces acceptance.
+- D01/B10 still require the owner's complete Codespaces verification and subsequent private/public network acceptance. The next operator action after verified publication is a fast-forward pull followed by strict workbench verification; no application restart or new transaction is required for this test-only correction.
+- Also prepared the owner-requested S3/us-west-2 whole-solution recovery design. Its deployment, automation and actual restore test remain D11 OPEN; no backup storage or upload was created.
+
 ## 27 November 2026 - Besu database acceptance evidence gate
 
 - Continued the owner-approved sequence: Besu payment acceptance and separate Base Sepolia regression before issuer-lifecycle expansion. No shared business refactor or issuer contract change.

@@ -1,5 +1,6 @@
-import {test,after} from 'node:test'
+import {test,before,after} from 'node:test'
 import assert from 'node:assert/strict'
+import {fileURLToPath} from 'node:url'
 import {privatePayment,privateAcceptance} from '../src/lib/settlement.ts'
 import {balance,explorer} from '../src/lib/safety.ts'
 import {createServer} from 'vite'
@@ -21,9 +22,12 @@ test('private token and gas arithmetic remains separate and exact to one wei',()
  assert.deepEqual(balance([{asset:'DEMOUSD',debit:'1',credit:'1'},{asset:'BESU_GAS',debit:'0.000000000000000002',credit:'0.000000000000000001'}]),{DEMOUSD:'0.000000',BESU_GAS:'0.000000000000000001'})
  assert.equal(explorer(20261125,'0x'+'a'.repeat(64),{chainId:20261125,explorerBaseUrl:'https://sepolia.basescan.org'}),undefined)
 })
-const server=await createServer({configFile:false,root:process.cwd(),plugins:[react()],server:{middlewareMode:true,watch:null},appType:'custom'})
-after(()=>server.close())
-const {PrivatePaymentViews}=await server.ssrLoadModule('/src/components/PrivatePaymentViews.tsx')
+let server,PrivatePaymentViews
+before(async()=>{
+ server=await createServer({configFile:false,root:fileURLToPath(new URL('../',import.meta.url)),plugins:[react()],server:{middlewareMode:true,watch:null},appType:'custom'})
+ ;({PrivatePaymentViews}=await server.ssrLoadModule('/src/components/PrivatePaymentViews.tsx'))
+})
+after(()=>server?.close())
 const render=(tab,extra={})=>renderToStaticMarkup(React.createElement(PrivatePaymentViews,{payment,evidence,privateEvidence,review,journey:{steps:[]},tab,enabled:true,approver:true,act:()=>{},...extra}))
 test('all private screens render with a private-only quote and no public explorer links',()=>{
  for(const tab of ['routing','treasury','approvals','journey','blockchain','ledger','payout']){

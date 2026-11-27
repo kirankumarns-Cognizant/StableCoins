@@ -718,3 +718,48 @@ Both support EVM contracts, but each network has its own state, token deployment
 The Base path accounts for execution and applicable L1 data fees; the private Besu configuration uses execution-only fees. A USD provider quote fee is a separate business-pricing observation. Confirmation policy and evidence must follow the selected network: a private QBFT receipt is meaningful private-chain evidence, but cannot be looked up on BaseScan or described as a public Base transaction. Payment identity must retain the selected chain/genesis/contract across retries.
 
 Sources: [accepted network/asset decision](../adr/ADR-016-BESU-MULTI-NETWORK-ORCHESTRATION.md), [private receipt/accounting bindings](../infrastructure/besu/SETTLEMENT-BINDINGS.md), [public receipt verifier](../scripts/demo/verify-receipt.cjs). These describe the POC design and do not claim any new runtime demonstration.
+
+
+## K10: How do I preserve the application if a Codespace is deleted?
+
+Date learned: 27 November 2026.
+
+A Codespace is a replaceable development computer. A remote Git repository preserves committed changes that have been pushed to it; deleting the Codespace does not delete that repository. Uncommitted edits and commits that exist only inside the Codespace are not protected by the remote copy. GitHub currently documents automatic deletion of inactive Codespaces after a retention period (30 days by default), including Codespaces with unpushed changes. Organization policies can impose a shorter period.
+
+Source control and application recovery protect different things:
+
+| Asset | What a recovery copy must preserve |
+| --- | --- |
+| Source, documentation, migrations and deployment definitions | Git history, branches and tags in the primary remote plus an independent protected backup; include Git LFS objects if used. |
+| Encrypted wallet keystores | Protected encrypted backups of all intentionally retained wallet generations. Passwords need separately secured recovery; a wallet address cannot recover its signing key. |
+| Environment settings and credentials | Approved secret storage and a recoverable configuration inventory. Never commit passwords, private keys or secret environment files, even to a private repository. |
+| PostgreSQL financial records | Consistent database backups containing payments, approvals, ledger, audit and transaction recovery records. Recreating tables from migrations does not restore business data. |
+| Private Besu network | Genesis/configuration, validator identities and keys, deployment/token identity and consistent chain state. Reinitializing a new network is different from recovering the existing network. |
+
+A practical design keeps the primary repository, a local clone and a versioned encrypted backup in an independent approved location. A second folder on the same disk is not independent protection. Synchronization alone can propagate accidental deletion; recoverable historical versions matter. A full Git mirror preserves repository history, whereas a downloaded source archive does not provide the same recovery coverage.
+
+Restoration must be rehearsed. For a financial application, restoring code alone does not restore balances or pending transaction knowledge. Database and chain recovery must be coordinated, and pending transaction evidence reconciled before payment workers resume. Avoid copying a running database or chain directory as though it were an ordinary document folder.
+
+Permanent hosting is separate from source backup. In this project's accepted direction, application hosting belongs on AWS ECS Fargate with PostgreSQL on Aurora, and private Besu nodes are planned on EC2. Codespaces supports development and demonstrations; hosting still needs its own persistence, backups and recovery design. This explanation does not assert that those backups or deployments have already been configured or tested.
+
+Sources: [GitHub Codespaces retention](https://docs.github.com/en/codespaces/setting-your-user-preferences/configuring-automatic-deletion-of-your-codespaces), [Codespace lifecycle](https://docs.github.com/en/codespaces/about-codespaces/understanding-the-codespace-lifecycle), [Backing up a repository](https://docs.github.com/en/repositories/archiving-a-github-repository/backing-up-a-repository), repository [AGENTS.md](../AGENTS.md) sections 8-10 and 19, and backlog AWS deployment scope A01-A03 in [40-IMPLEMENTATION-BACKLOG.md](40-IMPLEMENTATION-BACKLOG.md). Asset separation and coordinated recovery are engineering recommendations applied to this POC.
+
+
+### How do S3 and an encrypted backup tool preserve a whole application?
+
+Follow-up learned: 27 November 2026. S3 is durable object storage; a backup tool such as Restic organizes encrypted, recoverable snapshots in it. Client-side encryption protects file contents before upload. S3 versioning adds protection against accidental overwrite/deletion; neither replaces an independently recoverable encryption password or a restore drill. A backup stored in a Codespace that disappears with that Codespace is not an independent recovery copy.
+
+One application's state may live on several machines. A Windows folder backup cannot capture a PostgreSQL Docker volume or private-chain state that exists only in Codespaces. Recoverability requires an inventory and a coordinated checkpoint across the database, blockchain and queued events. A database dump can be internally consistent while being out of step with another system. Public-chain transactions continue independently; recovery must query their current outcome before allowing retries.
+
+A practical PoC solution uses a protected S3 destination, encrypted snapshots from each source environment, separate secret/password recovery, retained historical versions and a tested restoration into an isolated environment. Scheduling, retention and recovery-time targets are operating decisions; storage alone does not establish recoverability. Sources: [Restic S3 repository documentation](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html), [S3 Versioning](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html), [PostgreSQL consistent exports](https://www.postgresql.org/docs/16/app-pgdump.html), [Besu backup/restore](https://docs.besu-eth.org/private-networks/how-to/backup).
+
+
+## K11: Why can a test work from one folder and fail from another?
+
+Date learned: 27 November 2026.
+
+The current working directory belongs to the command that started a program; it is not necessarily the folder containing its source file. A test launched inside frontend and the same test launched by a repository-level verification tool can therefore resolve the same relative path differently. Resources tied to a module should be located relative to that module (for example, import.meta.url), while intentionally user-selected input may be relative to the working directory. This distinction makes automation portable across local terminals and CI/Codespaces.
+
+Tests that create servers, watchers or child processes also need a defined setup and cleanup lifecycle. An exception during top-level module loading can leave resources open before the test runner can report an ordinary test failure. Setup hooks keep failures inside the test lifecycle; teardown hooks close resources that were successfully created, including when later setup fails. A periodic heartbeat proves only that a supervising process is alive, not that a test is advancing. A timeout is a failure boundary, not evidence that assertions passed.
+
+Project example: a Vite rendering fixture locates frontend from its own test file and closes its test-owned server after execution. This affects test infrastructure, not blockchain confirmation or payment settlement. Sources: [settlement rendering tests](../frontend/tests/settlement.test.mjs) and [verification runner](../scripts/local-workbench.cjs).
